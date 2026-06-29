@@ -2,30 +2,23 @@
 ==========================================================
 ARCHIVUM
 Pantalla: Medido
-Versión: 0.3.1
+Versión: 0.3.5
 ==========================================================
 
-Pantalla principal de entrada de tomos conectada al Excel real.
-
-Funcionamiento:
-- Lee el Excel indicado en app.contexto.archivo_actual.
-- Detecta el último tomo escrito.
-- Detecta la última matriz final.
-- Guarda cada tomo directamente en el Excel.
-- Refresca la tabla inferior leyendo el Excel real.
-- Aplica color en la celda GRUIX:
-    Blanco  -> medida estándar
-    Rojo    -> medida distinta a la estándar
-    Amarillo-> medida "?"
+Cambios v0.3.5:
+- Autocompletado de fechas con día + mes: 1 EN -> 1 ENERO.
+- Validación de días según mes: evita 40 ENERO o 31 FEBRERO.
+- Mantiene protocolo final >= inicial, fecha inicial automática, colores, bordes y centrado.
 """
 
-import customtkinter as ctk
+import copy
+from pathlib import Path
 from tkinter import messagebox
 from tkinter import ttk
-from pathlib import Path
 
+import customtkinter as ctk
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 
 from config import (
     COLOR_BG,
@@ -47,11 +40,6 @@ from config import (
 )
 
 
-# ==========================================================
-# CONFIGURACIÓN EXCEL
-# ==========================================================
-
-FILA_CABECERA = 1
 FILA_INICIO_DATOS = 2
 
 COL_TOMO = "A"
@@ -63,15 +51,57 @@ COL_DATA_FINAL = "F"
 COL_GRUIX = "G"
 COL_OBSERVACIONS = "H"
 
+COLUMNAS_COLOR_FILA = [
+    COL_TOMO,
+    COL_ANY,
+    COL_PROT_INICIAL,
+    COL_DATA_INICIAL,
+    COL_PROT_FINAL,
+    COL_DATA_FINAL,
+    COL_GRUIX,
+    COL_OBSERVACIONS,
+]
+
 FILL_ROJO = PatternFill("solid", fgColor="FF3030")
 FILL_AMARILLO = PatternFill("solid", fgColor="FFE600")
-FILL_BLANCO = PatternFill(fill_type=None)
+FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
+
+ALINEACION_CENTRADA = Alignment(horizontal="center", vertical="center")
+
+MESES_AUTOCOMPLETAR = {
+    "E": "ENERO", "EN": "ENERO", "ENE": "ENERO", "ENERO": "ENERO",
+    "F": "FEBRERO", "FE": "FEBRERO", "FEB": "FEBRERO", "FEBRERO": "FEBRERO",
+    "MAR": "MARZO", "MARZ": "MARZO", "MARZO": "MARZO",
+    "AB": "ABRIL", "ABR": "ABRIL", "ABRI": "ABRIL", "ABRIL": "ABRIL",
+    "MAY": "MAYO", "MAYO": "MAYO",
+    "JUN": "JUNIO", "JUNI": "JUNIO", "JUNIO": "JUNIO",
+    "JUL": "JULIO", "JULI": "JULIO", "JULIO": "JULIO",
+    "AG": "AGOSTO", "AGO": "AGOSTO", "AGOS": "AGOSTO", "AGOSTO": "AGOSTO",
+    "S": "SEPTIEMBRE", "SE": "SEPTIEMBRE", "SEP": "SEPTIEMBRE", "SEPT": "SEPTIEMBRE",
+    "SET": "SEPTIEMBRE", "SEPTIEMBRE": "SEPTIEMBRE",
+    "O": "OCTUBRE", "OC": "OCTUBRE", "OCT": "OCTUBRE", "OCTUBRE": "OCTUBRE",
+    "N": "NOVIEMBRE", "NO": "NOVIEMBRE", "NOV": "NOVIEMBRE", "NOVIEMBRE": "NOVIEMBRE",
+    "D": "DICIEMBRE", "DI": "DICIEMBRE", "DIC": "DICIEMBRE", "DICIEMBRE": "DICIEMBRE",
+}
+
+DIAS_MAXIMOS_MES = {
+    "ENERO": 31,
+    "FEBRERO": 29,
+    "MARZO": 31,
+    "ABRIL": 30,
+    "MAYO": 31,
+    "JUNIO": 30,
+    "JULIO": 31,
+    "AGOSTO": 31,
+    "SEPTIEMBRE": 30,
+    "OCTUBRE": 31,
+    "NOVIEMBRE": 30,
+    "DICIEMBRE": 31,
+}
 
 
 class PantallaMedido(ctk.CTkFrame):
-    """
-    Pantalla de trabajo del medido.
-    """
+    """Pantalla de trabajo del medido."""
 
     def __init__(self, master, app):
         super().__init__(master, fg_color=COLOR_BG)
@@ -85,6 +115,7 @@ class PantallaMedido(ctk.CTkFrame):
         self.tomo_actual = 1
         self.ultima_fila = FILA_INICIO_DATOS
         self.ultima_matriz_final = None
+        self.ultima_fecha_final = None
         self.matriz_inicio_esperada = None
 
         self.pack(fill="both", expand=True)
@@ -110,18 +141,11 @@ class PantallaMedido(ctk.CTkFrame):
         return wb, ws
 
     def _cargar_estado_excel(self):
-        """
-        Lee el Excel actual y detecta:
-        - siguiente fila libre;
-        - siguiente número de tomo;
-        - última matriz final;
-        - matriz inicio esperada.
-        """
-
         if not self.ruta_excel or not self.ruta_excel.exists():
             self.tomo_actual = self.contexto.tomo_actual or 1
             self.ultima_fila = FILA_INICIO_DATOS
             self.ultima_matriz_final = None
+            self.ultima_fecha_final = None
             self.matriz_inicio_esperada = None
             return
 
@@ -141,11 +165,13 @@ class PantallaMedido(ctk.CTkFrame):
             self.tomo_actual = 1
             self.ultima_fila = FILA_INICIO_DATOS
             self.ultima_matriz_final = None
+            self.ultima_fecha_final = None
             self.matriz_inicio_esperada = None
             return
 
         ultimo_tomo = ws[f"{COL_TOMO}{ultima_fila_con_datos}"].value
         ultima_matriz = ws[f"{COL_PROT_FINAL}{ultima_fila_con_datos}"].value
+        ultima_fecha_final = ws[f"{COL_DATA_FINAL}{ultima_fila_con_datos}"].value
 
         try:
             self.tomo_actual = int(ultimo_tomo) + 1
@@ -159,17 +185,18 @@ class PantallaMedido(ctk.CTkFrame):
             self.matriz_inicio_esperada = self.ultima_matriz_final + 1
         except Exception:
             self.ultima_matriz_final = None
+            self.ultima_fecha_final = None
             self.matriz_inicio_esperada = None
+
+        self.ultima_fecha_final = str(ultima_fecha_final) if ultima_fecha_final not in (None, "") else None
 
         self.contexto.tomo_actual = self.tomo_actual
 
     def _guardar_en_excel(self, datos):
-        """
-        Escribe el tomo en el Excel real y guarda el archivo.
-        """
-
         wb, ws = self._abrir_libro()
         fila = self.ultima_fila
+
+        self._copiar_estilo_base(ws, fila)
 
         ws[f"{COL_TOMO}{fila}"] = datos["tomo"]
         ws[f"{COL_ANY}{fila}"] = datos["anio"]
@@ -180,29 +207,54 @@ class PantallaMedido(ctk.CTkFrame):
         ws[f"{COL_GRUIX}{fila}"] = datos["medida"]
         ws[f"{COL_OBSERVACIONS}{fila}"] = datos["observaciones"]
 
-        self._aplicar_color_medida(ws, fila, datos["medida"])
+        self._aplicar_color_fila(ws, fila, datos["medida"])
+        self._centrar_fila(ws, fila)
 
         wb.save(self.ruta_excel)
 
-    def _aplicar_color_medida(self, ws, fila, medida):
+    def _copiar_estilo_base(self, ws, fila):
         """
-        Aplica color solo a la celda de medida / GRUIX.
+        Copia bordes, fuente, formato y dimensiones desde una fila base.
+
+        Si existe fila anterior, se usa la anterior.
+        Si es el primer tomo, se usa la fila 2 de la plantilla.
         """
 
-        celda = ws[f"{COL_GRUIX}{fila}"]
-
-        if medida == "?":
-            celda.fill = FILL_AMARILLO
-        elif medida != self.medida_estandar:
-            celda.fill = FILL_ROJO
+        if fila > FILA_INICIO_DATOS:
+            fila_base = fila - 1
         else:
-            celda.fill = FILL_BLANCO
+            fila_base = FILA_INICIO_DATOS
+
+        for columna in COLUMNAS_COLOR_FILA:
+            origen = ws[f"{columna}{fila_base}"]
+            destino = ws[f"{columna}{fila}"]
+
+            if origen.has_style:
+                destino._style = copy.copy(origen._style)
+
+            destino.font = copy.copy(origen.font)
+            destino.border = copy.copy(origen.border)
+            destino.number_format = origen.number_format
+            destino.protection = copy.copy(origen.protection)
+
+        ws.row_dimensions[fila].height = ws.row_dimensions[fila_base].height
+
+    def _aplicar_color_fila(self, ws, fila, medida):
+        if medida == "?":
+            fill = FILL_AMARILLO
+        elif medida != self.medida_estandar:
+            fill = FILL_ROJO
+        else:
+            fill = FILL_BLANCO
+
+        for columna in COLUMNAS_COLOR_FILA:
+            ws[f"{columna}{fila}"].fill = copy.copy(fill)
+
+    def _centrar_fila(self, ws, fila):
+        for columna in COLUMNAS_COLOR_FILA:
+            ws[f"{columna}{fila}"].alignment = copy.copy(ALINEACION_CENTRADA)
 
     def _leer_filas_excel(self):
-        """
-        Devuelve todas las filas con datos del Excel.
-        """
-
         if not self.ruta_excel or not self.ruta_excel.exists():
             return []
 
@@ -236,16 +288,10 @@ class PantallaMedido(ctk.CTkFrame):
         self._crear_cabecera()
         self._crear_panel_entrada()
         self._crear_panel_tabla()
-
         self.matriz_inicio.focus_set()
 
     def _crear_cabecera(self):
-        cabecera = ctk.CTkFrame(
-            self,
-            fg_color=COLOR_PANEL,
-            height=90,
-            corner_radius=0,
-        )
+        cabecera = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=90, corner_radius=0)
         cabecera.pack(fill="x")
 
         archivo = str(self.ruta_excel) if self.ruta_excel else "SIN ARCHIVO"
@@ -353,12 +399,7 @@ class PantallaMedido(ctk.CTkFrame):
         y += salto
         self.observaciones = self._crear_campo(panel, "OBSERVACIONES", x_label, x_entry, y, ancho=620)
 
-        self.mensaje = ctk.CTkLabel(
-            panel,
-            text="",
-            font=FONT_SUBTITLE,
-            text_color=COLOR_GREEN,
-        )
+        self.mensaje = ctk.CTkLabel(panel, text="", font=FONT_SUBTITLE, text_color=COLOR_GREEN)
         self.mensaje.place(x=35, y=245)
 
         self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=70, anchor="center")
@@ -366,6 +407,7 @@ class PantallaMedido(ctk.CTkFrame):
         self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=190, anchor="center")
 
         self._autocompletar_matriz_inicio()
+        self._autocompletar_fecha_inicio()
 
     def _crear_panel_tabla(self):
         panel = ctk.CTkFrame(
@@ -384,11 +426,7 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_TEXT,
         ).pack(anchor="w", padx=20, pady=(15, 10))
 
-        contenedor = ctk.CTkFrame(
-            panel,
-            fg_color=COLOR_PANEL_2,
-            corner_radius=10,
-        )
+        contenedor = ctk.CTkFrame(panel, fg_color=COLOR_PANEL_2, corner_radius=10)
         contenedor.pack(fill="both", expand=True, padx=20, pady=(0, 20))
 
         columnas = (
@@ -402,11 +440,7 @@ class PantallaMedido(ctk.CTkFrame):
             "observacions",
         )
 
-        self.tabla = ttk.Treeview(
-            contenedor,
-            columns=columnas,
-            show="headings",
-        )
+        self.tabla = ttk.Treeview(contenedor, columns=columnas, show="headings")
 
         encabezados = {
             "tomo": "TOMO",
@@ -434,15 +468,12 @@ class PantallaMedido(ctk.CTkFrame):
             self.tabla.heading(col, text=encabezados[col])
             self.tabla.column(col, width=anchos[col], anchor="center")
 
-        self.tabla.column("observacions", anchor="w")
+        self.tabla.column("observacions", anchor="center")
 
         scroll_y = ttk.Scrollbar(contenedor, orient="vertical", command=self.tabla.yview)
         scroll_x = ttk.Scrollbar(contenedor, orient="horizontal", command=self.tabla.xview)
 
-        self.tabla.configure(
-            yscrollcommand=scroll_y.set,
-            xscrollcommand=scroll_x.set,
-        )
+        self.tabla.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
 
         self.tabla.grid(row=0, column=0, sticky="nsew")
         scroll_y.grid(row=0, column=1, sticky="ns")
@@ -454,12 +485,7 @@ class PantallaMedido(ctk.CTkFrame):
         self._configurar_estilo_tabla()
 
     def _crear_campo(self, master, etiqueta, x_label, x_entry, y, ancho):
-        ctk.CTkLabel(
-            master,
-            text=etiqueta,
-            font=FONT_NORMAL,
-            text_color=COLOR_TEXT,
-        ).place(x=x_label, y=y)
+        ctk.CTkLabel(master, text=etiqueta, font=FONT_NORMAL, text_color=COLOR_TEXT).place(x=x_label, y=y)
 
         campo = ctk.CTkEntry(
             master,
@@ -517,10 +543,7 @@ class PantallaMedido(ctk.CTkFrame):
             font=("Segoe UI", 12, "bold"),
         )
 
-        style.map(
-            "Treeview",
-            background=[("selected", "#003C5A")],
-        )
+        style.map("Treeview", background=[("selected", "#003C5A")])
 
         self.tabla.tag_configure("normal", background="#181818", foreground=COLOR_TEXT)
         self.tabla.tag_configure("especial", background=COLOR_RED, foreground="#FFFFFF")
@@ -567,9 +590,74 @@ class PantallaMedido(ctk.CTkFrame):
 
         for i, campo in enumerate(campos):
             if i < len(campos) - 1:
-                campo.bind("<Return>", lambda _event, idx=i: campos[idx + 1].focus_set())
+                campo.bind("<Return>", lambda _event, idx=i: self._enter_campo(campos, idx))
             else:
                 campo.bind("<Return>", lambda _event: self._guardar_tomo())
+
+        self.fecha_inicio.bind("<FocusOut>", lambda _event: self._normalizar_mes(self.fecha_inicio))
+        self.fecha_final.bind("<FocusOut>", lambda _event: self._normalizar_mes(self.fecha_final))
+
+    def _enter_campo(self, campos, idx):
+        campo_actual = campos[idx]
+
+        if campo_actual in (self.fecha_inicio, self.fecha_final):
+            self._normalizar_mes(campo_actual)
+
+        campos[idx + 1].focus_set()
+        return "break"
+
+    def _normalizar_mes(self, campo):
+        """
+        Normaliza fechas escritas como día + mes.
+
+        Ejemplos:
+        1 EN   -> 1 ENERO
+        15 FEB -> 15 FEBRERO
+        7 S    -> 7 SEPTIEMBRE
+
+        También acepta solo mes:
+        EN -> ENERO
+
+        No modifica formatos con barras, como 12/01/2025.
+        """
+
+        valor_original = campo.get().strip()
+        valor = valor_original.upper()
+
+        if not valor:
+            return
+
+        if "/" in valor or "-" in valor:
+            return
+
+        partes = valor.split()
+
+        if len(partes) == 1:
+            if partes[0].isalpha():
+                mes = MESES_AUTOCOMPLETAR.get(partes[0])
+                if mes:
+                    campo.delete(0, "end")
+                    campo.insert(0, mes)
+            return
+
+        if len(partes) < 2:
+            return
+
+        dia_texto = partes[0]
+        mes_texto = partes[1]
+
+        if not dia_texto.isdigit():
+            return
+
+        mes = MESES_AUTOCOMPLETAR.get(mes_texto)
+
+        if not mes:
+            return
+
+        dia = int(dia_texto)
+
+        campo.delete(0, "end")
+        campo.insert(0, f"{dia} {mes}")
 
     def _mayusculas(self, event):
         campo = event.widget
@@ -579,6 +667,43 @@ class PantallaMedido(ctk.CTkFrame):
         campo.delete(0, "end")
         campo.insert(0, texto.upper())
         campo.icursor(cursor)
+
+    def _validar_fecha_texto(self, valor):
+        """
+        Valida fechas tipo: 1 ENERO, 15 FEBRERO, 31 DICIEMBRE.
+
+        Si el formato no es día + mes, no bloquea, porque de momento
+        aceptamos texto libre y fechas manuales.
+        """
+
+        valor = valor.strip().upper()
+
+        if not valor:
+            return False, "Fecha vacía."
+
+        if "/" in valor or "-" in valor:
+            return True, ""
+
+        partes = valor.split()
+
+        if len(partes) != 2:
+            return True, ""
+
+        dia_texto, mes = partes
+
+        if not dia_texto.isdigit():
+            return True, ""
+
+        if mes not in DIAS_MAXIMOS_MES:
+            return True, ""
+
+        dia = int(dia_texto)
+        maximo = DIAS_MAXIMOS_MES[mes]
+
+        if dia < 1 or dia > maximo:
+            return False, f"Día incorrecto para {mes}. Máximo: {maximo}."
+
+        return True, ""
 
     def _validar(self):
         if not self.matriz_inicio.get().strip():
@@ -593,6 +718,17 @@ class PantallaMedido(ctk.CTkFrame):
         if not self.fecha_final.get().strip():
             return False, "Falta fecha final.", self.fecha_final
 
+        self._normalizar_mes(self.fecha_inicio)
+        self._normalizar_mes(self.fecha_final)
+
+        fecha_ok, fecha_msg = self._validar_fecha_texto(self.fecha_inicio.get())
+        if not fecha_ok:
+            return False, fecha_msg, self.fecha_inicio
+
+        fecha_ok, fecha_msg = self._validar_fecha_texto(self.fecha_final.get())
+        if not fecha_ok:
+            return False, fecha_msg, self.fecha_final
+
         if not self.medida.get().strip():
             return False, "Falta medida.", self.medida
 
@@ -603,14 +739,14 @@ class PantallaMedido(ctk.CTkFrame):
             return False, "Matriz final debe ser numérica.", self.matriz_final
 
         matriz_inicio = int(self.matriz_inicio.get().strip())
+        matriz_final = int(self.matriz_final.get().strip())
+
+        if matriz_final < matriz_inicio:
+            return False, "Protocolo final no puede ser menor que protocolo inicial.", self.matriz_final
 
         if self.tomo_actual > 1 and self.matriz_inicio_esperada is not None:
             if matriz_inicio != self.matriz_inicio_esperada:
-                return (
-                    False,
-                    f"Matriz inicio incorrecta. Esperada: {self.matriz_inicio_esperada}.",
-                    self.matriz_inicio,
-                )
+                return False, f"Matriz inicio incorrecta. Esperada: {self.matriz_inicio_esperada}.", self.matriz_inicio
 
         medida = self.medida.get().strip()
 
@@ -665,6 +801,7 @@ class PantallaMedido(ctk.CTkFrame):
 
         matriz_final_guardada = int(datos["matriz_final"])
         self.ultima_matriz_final = matriz_final_guardada
+        self.ultima_fecha_final = datos["fecha_final"]
         self.matriz_inicio_esperada = matriz_final_guardada + 1
 
         self._cargar_estado_excel()
@@ -677,6 +814,7 @@ class PantallaMedido(ctk.CTkFrame):
         self._actualizar_tomo()
         self._actualizar_matriz_esperada()
         self._autocompletar_matriz_inicio()
+        self._autocompletar_fecha_inicio()
 
         self.fecha_inicio.focus_set()
 
@@ -706,15 +844,22 @@ class PantallaMedido(ctk.CTkFrame):
         if self.matriz_inicio_esperada is None:
             self.label_matriz_esperada.configure(text="LIBRE", text_color=COLOR_CYAN)
         else:
-            self.label_matriz_esperada.configure(
-                text=str(self.matriz_inicio_esperada),
-                text_color=COLOR_GREEN,
-            )
+            self.label_matriz_esperada.configure(text=str(self.matriz_inicio_esperada), text_color=COLOR_GREEN)
 
     def _autocompletar_matriz_inicio(self):
         if self.matriz_inicio_esperada is not None:
             self.matriz_inicio.delete(0, "end")
             self.matriz_inicio.insert(0, str(self.matriz_inicio_esperada))
+
+    def _autocompletar_fecha_inicio(self):
+        """
+        Copia la fecha final del tomo anterior como fecha inicial del siguiente.
+        El campo queda editable.
+        """
+
+        if self.ultima_fecha_final:
+            self.fecha_inicio.delete(0, "end")
+            self.fecha_inicio.insert(0, str(self.ultima_fecha_final))
 
     # ======================================================
     # BOTONES
