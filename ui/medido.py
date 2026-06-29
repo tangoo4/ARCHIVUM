@@ -1,0 +1,542 @@
+"""
+==========================================================
+ARCHIVUM
+Pantalla: Medido
+Versión: 0.2.4
+==========================================================
+
+Pantalla principal de entrada de tomos.
+
+En esta versión todavía NO escribe en Excel real.
+La tabla inferior simula la vista completa del Excel.
+
+Cambios v0.2.4:
+- La matriz inicial se autocompleta con matriz final anterior + 1.
+- Desde el tomo 2, la matriz inicial debe coincidir obligatoriamente
+  con la matriz final del tomo anterior + 1.
+- El tomo 1 permite matriz inicial libre.
+"""
+
+import customtkinter as ctk
+from tkinter import messagebox
+from tkinter import ttk
+
+from config import (
+    COLOR_BG,
+    COLOR_PANEL,
+    COLOR_PANEL_2,
+    COLOR_BORDER,
+    COLOR_TEXT,
+    COLOR_TEXT_MUTED,
+    COLOR_GREEN,
+    COLOR_CYAN,
+    COLOR_RED,
+    COLOR_YELLOW,
+    FONT_SUBTITLE,
+    FONT_NORMAL,
+    FONT_TOMO,
+    DEFAULT_MEDIDA,
+    MAX_MEDIDA,
+    MAX_OBSERVACIONES,
+)
+
+
+class PantallaMedido(ctk.CTkFrame):
+    """
+    Pantalla de trabajo del medido.
+    """
+
+    def __init__(self, master, app):
+        super().__init__(master, fg_color=COLOR_BG)
+
+        self.app = app
+        self.contexto = app.contexto
+
+        self.tomo_actual = self.contexto.tomo_actual or 1
+        self.medida_estandar = self.contexto.medida_estandar or DEFAULT_MEDIDA
+
+        # Control de continuidad de matrices.
+        self.ultima_matriz_final = None
+        self.matriz_inicio_esperada = None
+
+        self.pack(fill="both", expand=True)
+
+        self._crear_interfaz()
+        self._configurar_enter()
+        self._actualizar_tomo()
+        self._actualizar_matriz_esperada()
+
+    # ======================================================
+    # INTERFAZ
+    # ======================================================
+
+    def _crear_interfaz(self):
+        self._crear_cabecera()
+        self._crear_panel_entrada()
+        self._crear_panel_tabla()
+
+        self.matriz_inicio.focus_set()
+
+    def _crear_cabecera(self):
+        cabecera = ctk.CTkFrame(
+            self,
+            fg_color=COLOR_PANEL,
+            height=90,
+            corner_radius=0,
+        )
+        cabecera.pack(fill="x")
+
+        archivo = self.contexto.archivo_actual or "SIN ARCHIVO"
+
+        ctk.CTkLabel(
+            cabecera,
+            text=f"ARCHIVO: {archivo}",
+            font=FONT_SUBTITLE,
+            text_color=COLOR_TEXT,
+        ).place(x=30, y=14)
+
+        ctk.CTkLabel(
+            cabecera,
+            text="● GUARDADO",
+            font=FONT_NORMAL,
+            text_color=COLOR_GREEN,
+        ).place(x=30, y=52)
+
+        info = (
+            f"TIPO: {self.contexto.tipo or '-'}    "
+            f"AÑO: {self.contexto.anio or '-'}\n"
+            f"NOTARIO: {self.contexto.notario or '-'}\n"
+            f"MEDIDA BASE: {self.medida_estandar}"
+        )
+
+        panel_info = ctk.CTkFrame(
+            cabecera,
+            fg_color=COLOR_PANEL_2,
+            border_width=1,
+            border_color=COLOR_BORDER,
+            corner_radius=10,
+            width=380,
+            height=68,
+        )
+        panel_info.place(relx=0.98, y=11, anchor="ne")
+
+        ctk.CTkLabel(
+            panel_info,
+            text=info,
+            font=("Segoe UI", 13, "bold"),
+            text_color=COLOR_CYAN,
+            justify="left",
+        ).place(x=15, y=7)
+
+    def _crear_panel_entrada(self):
+        panel = ctk.CTkFrame(
+            self,
+            fg_color=COLOR_PANEL,
+            border_width=1,
+            border_color=COLOR_BORDER,
+            corner_radius=16,
+            height=300,
+        )
+        panel.pack(fill="x", padx=25, pady=(20, 10))
+
+        ctk.CTkLabel(
+            panel,
+            text="TOMO ACTUAL",
+            font=FONT_NORMAL,
+            text_color=COLOR_TEXT_MUTED,
+        ).place(x=35, y=30)
+
+        self.label_tomo = ctk.CTkLabel(
+            panel,
+            text=str(self.tomo_actual),
+            font=FONT_TOMO,
+            text_color=COLOR_GREEN,
+            fg_color=COLOR_PANEL_2,
+            width=150,
+            height=85,
+            corner_radius=14,
+        )
+        self.label_tomo.place(x=35, y=65)
+
+        ctk.CTkLabel(
+            panel,
+            text="MATRIZ INICIO ESPERADA",
+            font=("Segoe UI", 12, "bold"),
+            text_color=COLOR_TEXT_MUTED,
+        ).place(x=35, y=165)
+
+        self.label_matriz_esperada = ctk.CTkLabel(
+            panel,
+            text="LIBRE",
+            font=FONT_SUBTITLE,
+            text_color=COLOR_CYAN,
+        )
+        self.label_matriz_esperada.place(x=35, y=190)
+
+        x_label = 235
+        x_entry = 430
+        y = 32
+        salto = 45
+
+        self.matriz_inicio = self._crear_campo(panel, "MATRIZ INICIO", x_label, x_entry, y, ancho=240)
+        y += salto
+        self.fecha_inicio = self._crear_campo(panel, "FECHA INICIO", x_label, x_entry, y, ancho=240)
+        y += salto
+        self.matriz_final = self._crear_campo(panel, "MATRIZ FINAL", x_label, x_entry, y, ancho=240)
+        y += salto
+        self.fecha_final = self._crear_campo(panel, "FECHA FINAL", x_label, x_entry, y, ancho=240)
+        y += salto
+        self.medida = self._crear_campo(panel, "MEDIDA", x_label, x_entry, y, ancho=140)
+        self.medida.insert(0, self.medida_estandar)
+        y += salto
+        self.observaciones = self._crear_campo(panel, "OBSERVACIONES", x_label, x_entry, y, ancho=620)
+
+        self.mensaje = ctk.CTkLabel(
+            panel,
+            text="",
+            font=FONT_SUBTITLE,
+            text_color=COLOR_GREEN,
+        )
+        self.mensaje.place(x=35, y=245)
+
+        self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=70, anchor="center")
+        self._boton_secundario(panel, "BACKUP", self._backup).place(relx=0.83, y=130, anchor="center")
+        self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=190, anchor="center")
+
+    def _crear_panel_tabla(self):
+        panel = ctk.CTkFrame(
+            self,
+            fg_color=COLOR_PANEL,
+            border_width=1,
+            border_color=COLOR_BORDER,
+            corner_radius=16,
+        )
+        panel.pack(fill="both", expand=True, padx=25, pady=(10, 20))
+
+        ctk.CTkLabel(
+            panel,
+            text="VISTA COMPLETA DEL EXCEL",
+            font=FONT_SUBTITLE,
+            text_color=COLOR_TEXT,
+        ).pack(anchor="w", padx=20, pady=(15, 10))
+
+        contenedor = ctk.CTkFrame(
+            panel,
+            fg_color=COLOR_PANEL_2,
+            corner_radius=10,
+        )
+        contenedor.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+
+        columnas = (
+            "tomo",
+            "any",
+            "prot_inicial",
+            "data_inicial",
+            "prot_final",
+            "data_final",
+            "gruix",
+            "observacions",
+        )
+
+        self.tabla = ttk.Treeview(
+            contenedor,
+            columns=columnas,
+            show="headings",
+        )
+
+        encabezados = {
+            "tomo": "TOMO",
+            "any": "ANY",
+            "prot_inicial": "PROT INICIAL",
+            "data_inicial": "DATA INICIAL",
+            "prot_final": "PROT FINAL",
+            "data_final": "DATA FINAL",
+            "gruix": "GRUIX",
+            "observacions": "OBSERVACIONS",
+        }
+
+        anchos = {
+            "tomo": 70,
+            "any": 80,
+            "prot_inicial": 130,
+            "data_inicial": 130,
+            "prot_final": 130,
+            "data_final": 130,
+            "gruix": 90,
+            "observacions": 500,
+        }
+
+        for col in columnas:
+            self.tabla.heading(col, text=encabezados[col])
+            self.tabla.column(col, width=anchos[col], anchor="center")
+
+        self.tabla.column("observacions", anchor="w")
+
+        scroll_y = ttk.Scrollbar(contenedor, orient="vertical", command=self.tabla.yview)
+        scroll_x = ttk.Scrollbar(contenedor, orient="horizontal", command=self.tabla.xview)
+
+        self.tabla.configure(
+            yscrollcommand=scroll_y.set,
+            xscrollcommand=scroll_x.set,
+        )
+
+        self.tabla.grid(row=0, column=0, sticky="nsew")
+        scroll_y.grid(row=0, column=1, sticky="ns")
+        scroll_x.grid(row=1, column=0, sticky="ew")
+
+        contenedor.grid_rowconfigure(0, weight=1)
+        contenedor.grid_columnconfigure(0, weight=1)
+
+        self._configurar_estilo_tabla()
+
+    def _crear_campo(self, master, etiqueta, x_label, x_entry, y, ancho):
+        ctk.CTkLabel(
+            master,
+            text=etiqueta,
+            font=FONT_NORMAL,
+            text_color=COLOR_TEXT,
+        ).place(x=x_label, y=y)
+
+        campo = ctk.CTkEntry(
+            master,
+            width=ancho,
+            height=36,
+            fg_color=COLOR_PANEL_2,
+            border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=8,
+        )
+        campo.place(x=x_entry, y=y - 5)
+
+        campo.bind("<KeyRelease>", self._mayusculas)
+        campo.bind("<FocusIn>", lambda _event, c=campo: c.configure(border_color=COLOR_CYAN))
+        campo.bind("<FocusOut>", lambda _event, c=campo: c.configure(border_color=COLOR_BORDER))
+
+        return campo
+
+    def _boton_secundario(self, master, texto, comando):
+        return ctk.CTkButton(
+            master,
+            text=texto,
+            command=comando,
+            width=170,
+            height=42,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=10,
+        )
+
+    # ======================================================
+    # TABLA
+    # ======================================================
+
+    def _configurar_estilo_tabla(self):
+        style = ttk.Style()
+        style.theme_use("default")
+
+        style.configure(
+            "Treeview",
+            background="#181818",
+            foreground=COLOR_TEXT,
+            fieldbackground="#181818",
+            rowheight=28,
+            font=("Segoe UI", 12),
+        )
+
+        style.configure(
+            "Treeview.Heading",
+            background=COLOR_PANEL_2,
+            foreground=COLOR_CYAN,
+            font=("Segoe UI", 12, "bold"),
+        )
+
+        style.map(
+            "Treeview",
+            background=[("selected", "#003C5A")],
+        )
+
+        self.tabla.tag_configure("normal", background="#181818", foreground=COLOR_TEXT)
+        self.tabla.tag_configure("especial", background=COLOR_RED, foreground="#FFFFFF")
+        self.tabla.tag_configure("interrogante", background=COLOR_YELLOW, foreground="#000000")
+
+    def _insertar_fila_tabla(self, datos, tag):
+        item = self.tabla.insert("", "end", values=datos, tags=(tag,))
+        self.tabla.see(item)
+
+    # ======================================================
+    # TECLADO Y VALIDACIONES
+    # ======================================================
+
+    def _configurar_enter(self):
+        campos = [
+            self.matriz_inicio,
+            self.fecha_inicio,
+            self.matriz_final,
+            self.fecha_final,
+            self.medida,
+            self.observaciones,
+        ]
+
+        for i, campo in enumerate(campos):
+            if i < len(campos) - 1:
+                campo.bind("<Return>", lambda _event, idx=i: campos[idx + 1].focus_set())
+            else:
+                campo.bind("<Return>", lambda _event: self._guardar_tomo())
+
+    def _mayusculas(self, event):
+        campo = event.widget
+        texto = campo.get()
+        cursor = campo.index("insert")
+
+        campo.delete(0, "end")
+        campo.insert(0, texto.upper())
+        campo.icursor(cursor)
+
+    def _validar(self):
+        if not self.matriz_inicio.get().strip():
+            return False, "Falta matriz inicio.", self.matriz_inicio
+
+        if not self.fecha_inicio.get().strip():
+            return False, "Falta fecha inicio.", self.fecha_inicio
+
+        if not self.matriz_final.get().strip():
+            return False, "Falta matriz final.", self.matriz_final
+
+        if not self.fecha_final.get().strip():
+            return False, "Falta fecha final.", self.fecha_final
+
+        if not self.medida.get().strip():
+            return False, "Falta medida.", self.medida
+
+        if not self.matriz_inicio.get().strip().isdigit():
+            return False, "Matriz inicio debe ser numérica.", self.matriz_inicio
+
+        if not self.matriz_final.get().strip().isdigit():
+            return False, "Matriz final debe ser numérica.", self.matriz_final
+
+        matriz_inicio = int(self.matriz_inicio.get().strip())
+
+        if self.tomo_actual > 1 and self.matriz_inicio_esperada is not None:
+            if matriz_inicio != self.matriz_inicio_esperada:
+                return (
+                    False,
+                    f"Matriz inicio incorrecta. Esperada: {self.matriz_inicio_esperada}.",
+                    self.matriz_inicio,
+                )
+
+        medida = self.medida.get().strip()
+
+        if not self._validar_medida(medida):
+            return False, "Medida incorrecta. Usa número hasta 10 con coma, o ?.", self.medida
+
+        if len(self.observaciones.get()) > MAX_OBSERVACIONES:
+            return False, f"Observaciones no puede superar {MAX_OBSERVACIONES} caracteres.", self.observaciones
+
+        return True, "", None
+
+    def _validar_medida(self, medida):
+        if medida == "?":
+            return True
+
+        try:
+            valor = float(medida.replace(",", "."))
+        except ValueError:
+            return False
+
+        return 0 < valor <= MAX_MEDIDA
+
+    # ======================================================
+    # GUARDADO DEMO
+    # ======================================================
+
+    def _guardar_tomo(self):
+        ok, mensaje, campo = self._validar()
+
+        if not ok:
+            messagebox.showwarning("Datos incorrectos", mensaje)
+            if campo:
+                campo.focus_set()
+            return
+
+        medida = self.medida.get().strip()
+
+        datos = (
+            self.tomo_actual,
+            self.contexto.anio or "",
+            self.matriz_inicio.get().strip(),
+            self.fecha_inicio.get().strip(),
+            self.matriz_final.get().strip(),
+            self.fecha_final.get().strip(),
+            medida,
+            self.observaciones.get().strip(),
+        )
+
+        tag = self._tag_medida(medida)
+
+        self._insertar_fila_tabla(datos, tag)
+
+        matriz_final_guardada = int(self.matriz_final.get().strip())
+        self.ultima_matriz_final = matriz_final_guardada
+        self.matriz_inicio_esperada = matriz_final_guardada + 1
+
+        self.mensaje.configure(text=f"✔ TOMO {self.tomo_actual} GUARDADO")
+        self.after(1000, lambda: self.mensaje.configure(text=""))
+
+        self.tomo_actual += 1
+        self.contexto.tomo_actual = self.tomo_actual
+
+        self._limpiar_formulario()
+        self._actualizar_tomo()
+        self._actualizar_matriz_esperada()
+        self._autocompletar_matriz_inicio()
+
+        self.fecha_inicio.focus_set()
+
+    def _tag_medida(self, medida):
+        if medida == "?":
+            return "interrogante"
+
+        if medida != self.medida_estandar:
+            return "especial"
+
+        return "normal"
+
+    def _limpiar_formulario(self):
+        self.matriz_inicio.delete(0, "end")
+        self.fecha_inicio.delete(0, "end")
+        self.matriz_final.delete(0, "end")
+        self.fecha_final.delete(0, "end")
+        self.medida.delete(0, "end")
+        self.observaciones.delete(0, "end")
+
+        self.medida.insert(0, self.medida_estandar)
+
+    def _actualizar_tomo(self):
+        self.label_tomo.configure(text=str(self.tomo_actual))
+
+    def _actualizar_matriz_esperada(self):
+        if self.matriz_inicio_esperada is None:
+            self.label_matriz_esperada.configure(text="LIBRE", text_color=COLOR_CYAN)
+        else:
+            self.label_matriz_esperada.configure(
+                text=str(self.matriz_inicio_esperada),
+                text_color=COLOR_GREEN,
+            )
+
+    def _autocompletar_matriz_inicio(self):
+        if self.matriz_inicio_esperada is not None:
+            self.matriz_inicio.delete(0, "end")
+            self.matriz_inicio.insert(0, str(self.matriz_inicio_esperada))
+
+    # ======================================================
+    # BOTONES
+    # ======================================================
+
+    def _buscador(self):
+        messagebox.showinfo("Buscador", "Buscador pendiente.")
+
+    def _backup(self):
+        messagebox.showinfo("Backup", "Backup pendiente.")
