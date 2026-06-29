@@ -2,24 +2,30 @@
 ==========================================================
 ARCHIVUM
 Pantalla: Medido
-Versión: 0.2.4
+Versión: 0.3.1
 ==========================================================
 
-Pantalla principal de entrada de tomos.
+Pantalla principal de entrada de tomos conectada al Excel real.
 
-En esta versión todavía NO escribe en Excel real.
-La tabla inferior simula la vista completa del Excel.
-
-Cambios v0.2.4:
-- La matriz inicial se autocompleta con matriz final anterior + 1.
-- Desde el tomo 2, la matriz inicial debe coincidir obligatoriamente
-  con la matriz final del tomo anterior + 1.
-- El tomo 1 permite matriz inicial libre.
+Funcionamiento:
+- Lee el Excel indicado en app.contexto.archivo_actual.
+- Detecta el último tomo escrito.
+- Detecta la última matriz final.
+- Guarda cada tomo directamente en el Excel.
+- Refresca la tabla inferior leyendo el Excel real.
+- Aplica color en la celda GRUIX:
+    Blanco  -> medida estándar
+    Rojo    -> medida distinta a la estándar
+    Amarillo-> medida "?"
 """
 
 import customtkinter as ctk
 from tkinter import messagebox
 from tkinter import ttk
+from pathlib import Path
+
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 from config import (
     COLOR_BG,
@@ -41,6 +47,27 @@ from config import (
 )
 
 
+# ==========================================================
+# CONFIGURACIÓN EXCEL
+# ==========================================================
+
+FILA_CABECERA = 1
+FILA_INICIO_DATOS = 2
+
+COL_TOMO = "A"
+COL_ANY = "B"
+COL_PROT_INICIAL = "C"
+COL_DATA_INICIAL = "D"
+COL_PROT_FINAL = "E"
+COL_DATA_FINAL = "F"
+COL_GRUIX = "G"
+COL_OBSERVACIONS = "H"
+
+FILL_ROJO = PatternFill("solid", fgColor="FF3030")
+FILL_AMARILLO = PatternFill("solid", fgColor="FFE600")
+FILL_BLANCO = PatternFill(fill_type=None)
+
+
 class PantallaMedido(ctk.CTkFrame):
     """
     Pantalla de trabajo del medido.
@@ -52,19 +79,154 @@ class PantallaMedido(ctk.CTkFrame):
         self.app = app
         self.contexto = app.contexto
 
-        self.tomo_actual = self.contexto.tomo_actual or 1
+        self.ruta_excel = Path(self.contexto.archivo_actual) if self.contexto.archivo_actual else None
         self.medida_estandar = self.contexto.medida_estandar or DEFAULT_MEDIDA
 
-        # Control de continuidad de matrices.
+        self.tomo_actual = 1
+        self.ultima_fila = FILA_INICIO_DATOS
         self.ultima_matriz_final = None
         self.matriz_inicio_esperada = None
 
         self.pack(fill="both", expand=True)
 
+        self._cargar_estado_excel()
+
         self._crear_interfaz()
         self._configurar_enter()
         self._actualizar_tomo()
         self._actualizar_matriz_esperada()
+        self._refrescar_tabla_desde_excel()
+
+    # ======================================================
+    # EXCEL
+    # ======================================================
+
+    def _abrir_libro(self):
+        if not self.ruta_excel or not self.ruta_excel.exists():
+            raise FileNotFoundError(f"No existe el archivo Excel:\n{self.ruta_excel}")
+
+        wb = load_workbook(self.ruta_excel)
+        ws = wb.active
+        return wb, ws
+
+    def _cargar_estado_excel(self):
+        """
+        Lee el Excel actual y detecta:
+        - siguiente fila libre;
+        - siguiente número de tomo;
+        - última matriz final;
+        - matriz inicio esperada.
+        """
+
+        if not self.ruta_excel or not self.ruta_excel.exists():
+            self.tomo_actual = self.contexto.tomo_actual or 1
+            self.ultima_fila = FILA_INICIO_DATOS
+            self.ultima_matriz_final = None
+            self.matriz_inicio_esperada = None
+            return
+
+        wb, ws = self._abrir_libro()
+
+        ultima_fila_con_datos = FILA_INICIO_DATOS - 1
+
+        for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
+            tomo = ws[f"{COL_TOMO}{fila}"].value
+            prot_final = ws[f"{COL_PROT_FINAL}{fila}"].value
+            fecha_final = ws[f"{COL_DATA_FINAL}{fila}"].value
+
+            if tomo not in (None, "") or prot_final not in (None, "") or fecha_final not in (None, ""):
+                ultima_fila_con_datos = fila
+
+        if ultima_fila_con_datos < FILA_INICIO_DATOS:
+            self.tomo_actual = 1
+            self.ultima_fila = FILA_INICIO_DATOS
+            self.ultima_matriz_final = None
+            self.matriz_inicio_esperada = None
+            return
+
+        ultimo_tomo = ws[f"{COL_TOMO}{ultima_fila_con_datos}"].value
+        ultima_matriz = ws[f"{COL_PROT_FINAL}{ultima_fila_con_datos}"].value
+
+        try:
+            self.tomo_actual = int(ultimo_tomo) + 1
+        except Exception:
+            self.tomo_actual = 1
+
+        self.ultima_fila = ultima_fila_con_datos + 1
+
+        try:
+            self.ultima_matriz_final = int(ultima_matriz)
+            self.matriz_inicio_esperada = self.ultima_matriz_final + 1
+        except Exception:
+            self.ultima_matriz_final = None
+            self.matriz_inicio_esperada = None
+
+        self.contexto.tomo_actual = self.tomo_actual
+
+    def _guardar_en_excel(self, datos):
+        """
+        Escribe el tomo en el Excel real y guarda el archivo.
+        """
+
+        wb, ws = self._abrir_libro()
+        fila = self.ultima_fila
+
+        ws[f"{COL_TOMO}{fila}"] = datos["tomo"]
+        ws[f"{COL_ANY}{fila}"] = datos["anio"]
+        ws[f"{COL_PROT_INICIAL}{fila}"] = int(datos["matriz_inicio"])
+        ws[f"{COL_DATA_INICIAL}{fila}"] = datos["fecha_inicio"]
+        ws[f"{COL_PROT_FINAL}{fila}"] = int(datos["matriz_final"])
+        ws[f"{COL_DATA_FINAL}{fila}"] = datos["fecha_final"]
+        ws[f"{COL_GRUIX}{fila}"] = datos["medida"]
+        ws[f"{COL_OBSERVACIONS}{fila}"] = datos["observaciones"]
+
+        self._aplicar_color_medida(ws, fila, datos["medida"])
+
+        wb.save(self.ruta_excel)
+
+    def _aplicar_color_medida(self, ws, fila, medida):
+        """
+        Aplica color solo a la celda de medida / GRUIX.
+        """
+
+        celda = ws[f"{COL_GRUIX}{fila}"]
+
+        if medida == "?":
+            celda.fill = FILL_AMARILLO
+        elif medida != self.medida_estandar:
+            celda.fill = FILL_ROJO
+        else:
+            celda.fill = FILL_BLANCO
+
+    def _leer_filas_excel(self):
+        """
+        Devuelve todas las filas con datos del Excel.
+        """
+
+        if not self.ruta_excel or not self.ruta_excel.exists():
+            return []
+
+        wb, ws = self._abrir_libro()
+        filas = []
+
+        for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
+            tomo = ws[f"{COL_TOMO}{fila}"].value
+
+            if tomo in (None, ""):
+                continue
+
+            filas.append({
+                "tomo": ws[f"{COL_TOMO}{fila}"].value,
+                "anio": ws[f"{COL_ANY}{fila}"].value,
+                "matriz_inicio": ws[f"{COL_PROT_INICIAL}{fila}"].value,
+                "fecha_inicio": ws[f"{COL_DATA_INICIAL}{fila}"].value,
+                "matriz_final": ws[f"{COL_PROT_FINAL}{fila}"].value,
+                "fecha_final": ws[f"{COL_DATA_FINAL}{fila}"].value,
+                "medida": ws[f"{COL_GRUIX}{fila}"].value,
+                "observaciones": ws[f"{COL_OBSERVACIONS}{fila}"].value or "",
+            })
+
+        return filas
 
     # ======================================================
     # INTERFAZ
@@ -86,7 +248,7 @@ class PantallaMedido(ctk.CTkFrame):
         )
         cabecera.pack(fill="x")
 
-        archivo = self.contexto.archivo_actual or "SIN ARCHIVO"
+        archivo = str(self.ruta_excel) if self.ruta_excel else "SIN ARCHIVO"
 
         ctk.CTkLabel(
             cabecera,
@@ -202,6 +364,8 @@ class PantallaMedido(ctk.CTkFrame):
         self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=70, anchor="center")
         self._boton_secundario(panel, "BACKUP", self._backup).place(relx=0.83, y=130, anchor="center")
         self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=190, anchor="center")
+
+        self._autocompletar_matriz_inicio()
 
     def _crear_panel_tabla(self):
         panel = ctk.CTkFrame(
@@ -362,9 +526,30 @@ class PantallaMedido(ctk.CTkFrame):
         self.tabla.tag_configure("especial", background=COLOR_RED, foreground="#FFFFFF")
         self.tabla.tag_configure("interrogante", background=COLOR_YELLOW, foreground="#000000")
 
-    def _insertar_fila_tabla(self, datos, tag):
-        item = self.tabla.insert("", "end", values=datos, tags=(tag,))
-        self.tabla.see(item)
+    def _refrescar_tabla_desde_excel(self):
+        for item in self.tabla.get_children():
+            self.tabla.delete(item)
+
+        for fila in self._leer_filas_excel():
+            medida = str(fila["medida"] or "")
+            tag = self._tag_medida(medida)
+
+            item = self.tabla.insert(
+                "",
+                "end",
+                values=(
+                    fila["tomo"],
+                    fila["anio"],
+                    fila["matriz_inicio"],
+                    fila["fecha_inicio"],
+                    fila["matriz_final"],
+                    fila["fecha_final"],
+                    fila["medida"],
+                    fila["observaciones"],
+                ),
+                tags=(tag,),
+            )
+            self.tabla.see(item)
 
     # ======================================================
     # TECLADO Y VALIDACIONES
@@ -449,7 +634,7 @@ class PantallaMedido(ctk.CTkFrame):
         return 0 < valor <= MAX_MEDIDA
 
     # ======================================================
-    # GUARDADO DEMO
+    # GUARDADO REAL
     # ======================================================
 
     def _guardar_tomo(self):
@@ -461,32 +646,32 @@ class PantallaMedido(ctk.CTkFrame):
                 campo.focus_set()
             return
 
-        medida = self.medida.get().strip()
+        datos = {
+            "tomo": self.tomo_actual,
+            "anio": self.contexto.anio or "",
+            "matriz_inicio": self.matriz_inicio.get().strip(),
+            "fecha_inicio": self.fecha_inicio.get().strip(),
+            "matriz_final": self.matriz_final.get().strip(),
+            "fecha_final": self.fecha_final.get().strip(),
+            "medida": self.medida.get().strip(),
+            "observaciones": self.observaciones.get().strip(),
+        }
 
-        datos = (
-            self.tomo_actual,
-            self.contexto.anio or "",
-            self.matriz_inicio.get().strip(),
-            self.fecha_inicio.get().strip(),
-            self.matriz_final.get().strip(),
-            self.fecha_final.get().strip(),
-            medida,
-            self.observaciones.get().strip(),
-        )
+        try:
+            self._guardar_en_excel(datos)
+        except Exception as e:
+            messagebox.showerror("Error al guardar", f"No se pudo guardar en Excel:\n\n{e}")
+            return
 
-        tag = self._tag_medida(medida)
-
-        self._insertar_fila_tabla(datos, tag)
-
-        matriz_final_guardada = int(self.matriz_final.get().strip())
+        matriz_final_guardada = int(datos["matriz_final"])
         self.ultima_matriz_final = matriz_final_guardada
         self.matriz_inicio_esperada = matriz_final_guardada + 1
 
-        self.mensaje.configure(text=f"✔ TOMO {self.tomo_actual} GUARDADO")
-        self.after(1000, lambda: self.mensaje.configure(text=""))
+        self._cargar_estado_excel()
+        self._refrescar_tabla_desde_excel()
 
-        self.tomo_actual += 1
-        self.contexto.tomo_actual = self.tomo_actual
+        self.mensaje.configure(text=f"✔ TOMO {datos['tomo']} GUARDADO")
+        self.after(1000, lambda: self.mensaje.configure(text=""))
 
         self._limpiar_formulario()
         self._actualizar_tomo()

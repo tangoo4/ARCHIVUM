@@ -2,19 +2,31 @@
 ==========================================================
 ARCHIVUM
 Pantalla: Nueva Temporada
-Versión: 0.2.2
+Versión: 0.3.0
 ==========================================================
 
-Esta pantalla recoge los datos mínimos para iniciar una temporada.
-En esta versión todavía NO crea el Excel real. Solo prepara el
-contexto de trabajo para pasar a la pantalla de medido.
+Crea físicamente un Excel nuevo desde la plantilla de medido.
 
-La creación real desde plantilla se añadirá cuando conectemos
-el módulo excel/gestor_excel.py.
+Flujo:
+- Validar datos.
+- Generar nombre del archivo.
+- Copiar la plantilla.
+- Guardar el Excel en la carpeta de trabajo actual.
+- Actualizar el contexto.
+- Abrir pantalla de medido.
+
+IMPORTANTE:
+La plantilla debe estar en:
+ARCHIVUM/excel/PLANTILLA_MEDIDO.xlsx
+
+Si no existe, intentará usar:
+ARCHIVUM/excel/plantilla.xlsx
 """
 
 import customtkinter as ctk
 from tkinter import messagebox
+from pathlib import Path
+import shutil
 import unicodedata
 
 from config import (
@@ -38,7 +50,7 @@ from config import (
 
 def limpiar_nombre(texto: str) -> str:
     """
-    Convierte el nombre del notario a un formato limpio para archivo.
+    Convierte un texto en formato seguro para nombre de archivo.
 
     Ejemplo:
     Salvador Farrés Ripoll -> SALVADOR_FARRES_RIPOLL
@@ -54,7 +66,7 @@ def limpiar_nombre(texto: str) -> str:
 
 class PantallaNuevaTemporada(ctk.CTkFrame):
     """
-    Pantalla para crear una nueva temporada.
+    Pantalla para crear una nueva temporada desde plantilla.
     """
 
     def __init__(self, master, app):
@@ -91,14 +103,14 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
 
         ctk.CTkLabel(
             cabecera,
-            text="Preparar un nuevo archivo de trabajo desde plantilla",
+            text="Crear un nuevo archivo Excel desde plantilla",
             font=FONT_NORMAL,
             text_color=COLOR_TEXT_MUTED,
         ).place(x=32, y=58)
 
         ctk.CTkLabel(
             cabecera,
-            text="v0.2.2",
+            text="v0.3.0",
             font=FONT_NORMAL,
             text_color=COLOR_CYAN,
         ).place(relx=0.97, y=35, anchor="e")
@@ -145,8 +157,8 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
 
         self._boton_principal(
             botones,
-            "CONTINUAR",
-            self._continuar,
+            "CREAR TEMPORADA",
+            self._crear_temporada,
         ).pack(side="left", padx=12)
 
         self.notario.focus_set()
@@ -238,7 +250,7 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
     def _configurar_enter(self):
         self.notario.bind("<Return>", lambda _event: self.anio.focus_set())
         self.anio.bind("<Return>", lambda _event: self.medida.focus_set())
-        self.medida.bind("<Return>", lambda _event: self._continuar())
+        self.medida.bind("<Return>", lambda _event: self._crear_temporada())
 
     def _mayusculas(self, event):
         campo = event.widget
@@ -276,34 +288,97 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
 
         return 0 < valor <= 10
 
-    def _continuar(self):
+    # ======================================================
+    # CREACIÓN DE EXCEL
+    # ======================================================
+
+    def _buscar_plantilla(self) -> Path | None:
+        """
+        Busca la plantilla en la carpeta excel/.
+        Acepta dos nombres para evitar errores:
+        - PLANTILLA_MEDIDO.xlsx
+        - plantilla.xlsx
+        """
+
+        base = Path.cwd()
+        posibles = [
+            base / "excel" / "PLANTILLA_MEDIDO.xlsx",
+            base / "excel" / "plantilla.xlsx",
+        ]
+
+        for ruta in posibles:
+            if ruta.exists():
+                return ruta
+
+        return None
+
+    def _crear_temporada(self):
         ok, mensaje = self._validar()
 
         if not ok:
             messagebox.showwarning("Datos incorrectos", mensaje)
             return
 
+        plantilla = self._buscar_plantilla()
+
+        if plantilla is None:
+            messagebox.showerror(
+                "Plantilla no encontrada",
+                (
+                    "No se encontró la plantilla.\n\n"
+                    "Debe estar en una de estas rutas:\n\n"
+                    "ARCHIVUM/excel/PLANTILLA_MEDIDO.xlsx\n"
+                    "ARCHIVUM/excel/plantilla.xlsx"
+                ),
+            )
+            return
+
         tipo = self.tipo.get().strip().upper()
+        tipo_archivo = limpiar_nombre(tipo)
         notario_limpio = limpiar_nombre(self.notario.get())
         anio = self.anio.get().strip()
         medida = self.medida.get().strip()
 
-        nombre_archivo = f"{tipo}_{notario_limpio}_{anio}.xlsx"
+        nombre_archivo = f"{tipo_archivo}_{notario_limpio}_{anio}.xlsx"
+
+        # Por ahora se crea en la carpeta raíz desde donde se ejecuta Archivum.
+        # Esto encaja con la idea de ejecutar Archivum dentro de la carpeta del notario.
+        destino = Path.cwd() / nombre_archivo
+
+        if destino.exists():
+            respuesta = messagebox.askyesno(
+                "Archivo existente",
+                (
+                    f"Ya existe el archivo:\n\n{destino}\n\n"
+                    "¿Deseas sobrescribirlo?"
+                ),
+            )
+
+            if not respuesta:
+                return
+
+        try:
+            shutil.copy2(plantilla, destino)
+        except Exception as e:
+            messagebox.showerror(
+                "Error al crear archivo",
+                f"No se pudo copiar la plantilla:\n\n{e}",
+            )
+            return
 
         self.app.contexto.tipo = tipo
         self.app.contexto.notario = notario_limpio
         self.app.contexto.anio = anio
         self.app.contexto.medida_estandar = medida
-        self.app.contexto.archivo_actual = nombre_archivo
+        self.app.contexto.archivo_actual = str(destino)
         self.app.contexto.tomo_actual = 1
 
         messagebox.showinfo(
-            "Temporada preparada",
+            "Temporada creada",
             (
-                "Temporada preparada correctamente.\n\n"
-                f"Archivo: {nombre_archivo}\n"
-                f"Medida estándar: {medida}\n\n"
-                "En la siguiente versión se creará el Excel real desde plantilla."
+                "Temporada creada correctamente.\n\n"
+                f"Archivo:\n{destino}\n\n"
+                f"Medida estándar: {medida}"
             ),
         )
 
