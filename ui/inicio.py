@@ -1,6 +1,6 @@
 """
 Pantalla de inicio de Archivum
-Versión 0.3.3
+Versión 0.5.2
 
 Cambios:
 - Al continuar temporada pide la medida estándar.
@@ -26,6 +26,7 @@ from config import (
     FONT_TITLE,
     FONT_NORMAL,
     FONT_SUBTITLE,
+    DIR_TEMPORADAS,
 )
 
 
@@ -100,7 +101,8 @@ class PantallaInicio(ctk.CTkFrame):
 
     def continuar(self):
         archivo = filedialog.askopenfilename(
-            title="Seleccionar archivo Excel",
+            title="Seleccionar temporada",
+            initialdir=DIR_TEMPORADAS if DIR_TEMPORADAS.exists() else None,
             filetypes=[("Excel", "*.xlsx"), ("Todos", "*.*")]
         )
 

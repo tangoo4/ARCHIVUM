@@ -2928,6 +2928,7 @@
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\\Lib\\typing.py',
    'PYMODULE'),
   ('ui', 'Z:\\Python\\ARCHIVUM\\ui\\__init__.py', 'PYMODULE'),
+  ('ui.control', 'Z:\\Python\\ARCHIVUM\\ui\\control.py', 'PYMODULE'),
   ('ui.inicio', 'Z:\\Python\\ARCHIVUM\\ui\\inicio.py', 'PYMODULE'),
   ('ui.medido', 'Z:\\Python\\ARCHIVUM\\ui\\medido.py', 'PYMODULE'),
   ('ui.nueva_temporada',

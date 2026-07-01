@@ -2,10 +2,14 @@
 ==========================================================
 ARCHIVUM
 Pantalla: Medido
-Versión: 0.3.5
+Versión: 0.5.0
 ==========================================================
 
-Cambios v0.3.5:
+Cambios v0.5.0:
+- Botón BACKUP sustituido por CONTROL.
+- CONTROL abre Estado, Validación, Incidencias, Historial y Producción.
+
+Cambios previos:
 - Autocompletado de fechas con día + mes: 1 EN -> 1 ENERO.
 - Validación de días según mes: evita 40 ENERO o 31 FEBRERO.
 - Mantiene protocolo final >= inicial, fecha inicial automática, colores, bordes y centrado.
@@ -19,6 +23,8 @@ from tkinter import ttk
 import customtkinter as ctk
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, PatternFill
+
+from ui.control import VentanaControl
 
 from config import (
     COLOR_BG,
@@ -403,7 +409,7 @@ class PantallaMedido(ctk.CTkFrame):
         self.mensaje.place(x=35, y=245)
 
         self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=70, anchor="center")
-        self._boton_secundario(panel, "BACKUP", self._backup).place(relx=0.83, y=130, anchor="center")
+        self._boton_secundario(panel, "CONTROL", self._control).place(relx=0.83, y=130, anchor="center")
         self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=190, anchor="center")
 
         self._autocompletar_matriz_inicio()
@@ -868,5 +874,5 @@ class PantallaMedido(ctk.CTkFrame):
     def _buscador(self):
         messagebox.showinfo("Buscador", "Buscador pendiente.")
 
-    def _backup(self):
-        messagebox.showinfo("Backup", "Backup pendiente.")
+    def _control(self):
+        VentanaControl(self, self.app)

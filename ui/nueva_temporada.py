@@ -2,10 +2,10 @@
 ==========================================================
 ARCHIVUM
 Pantalla: Nueva Temporada
-Versión: 0.3.0
+Versión: 0.6.0
 ==========================================================
 
-Crea físicamente un Excel nuevo desde la plantilla de medido.
+Crea una carpeta de temporada usando la plantilla interna del EXE si está disponible.
 
 Flujo:
 - Validar datos.
@@ -45,6 +45,8 @@ from config import (
     FONT_BUTTON,
     ENTRY_WIDTH,
     ENTRY_HEIGHT,
+    DIR_TEMPORADAS,
+    get_plantilla_path,
 )
 
 
@@ -294,23 +296,11 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
 
     def _buscar_plantilla(self) -> Path | None:
         """
-        Busca la plantilla en la carpeta excel/.
-        Acepta dos nombres para evitar errores:
-        - PLANTILLA_MEDIDO.xlsx
-        - plantilla.xlsx
+        Busca la plantilla en la carpeta de trabajo portable:
+        T:/excel/PLANTILLA_MEDIDO.xlsx
         """
 
-        base = Path.cwd()
-        posibles = [
-            base / "excel" / "PLANTILLA_MEDIDO.xlsx",
-            base / "excel" / "plantilla.xlsx",
-        ]
-
-        for ruta in posibles:
-            if ruta.exists():
-                return ruta
-
-        return None
+        return get_plantilla_path()
 
     def _crear_temporada(self):
         ok, mensaje = self._validar()
@@ -326,9 +316,9 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
                 "Plantilla no encontrada",
                 (
                     "No se encontró la plantilla.\n\n"
-                    "Debe estar en una de estas rutas:\n\n"
-                    "ARCHIVUM/excel/PLANTILLA_MEDIDO.xlsx\n"
-                    "ARCHIVUM/excel/plantilla.xlsx"
+                    "En la versión EXE final irá incluida dentro del programa.\n\n"
+                    "En modo desarrollo debe estar en:\n"
+                    "excel/PLANTILLA_MEDIDO.xlsx"
                 ),
             )
             return
@@ -339,18 +329,18 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
         anio = self.anio.get().strip()
         medida = self.medida.get().strip()
 
-        nombre_archivo = f"{tipo_archivo}_{notario_limpio}_{anio}.xlsx"
+        nombre_base = f"{tipo_archivo}_{notario_limpio}_{anio}"
+        nombre_archivo = f"{nombre_base}.xlsx"
 
-        # Por ahora se crea en la carpeta raíz desde donde se ejecuta Archivum.
-        # Esto encaja con la idea de ejecutar Archivum dentro de la carpeta del notario.
-        destino = Path.cwd() / nombre_archivo
+        carpeta_temporada = DIR_TEMPORADAS / nombre_base
+        destino = carpeta_temporada / nombre_archivo
 
-        if destino.exists():
+        if carpeta_temporada.exists():
             respuesta = messagebox.askyesno(
-                "Archivo existente",
+                "Temporada existente",
                 (
-                    f"Ya existe el archivo:\n\n{destino}\n\n"
-                    "¿Deseas sobrescribirlo?"
+                    f"Ya existe la temporada:\n\n{carpeta_temporada}\n\n"
+                    "¿Deseas sobrescribir el Excel de esta temporada?"
                 ),
             )
 
@@ -358,11 +348,31 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
                 return
 
         try:
+            carpeta_temporada.mkdir(parents=True, exist_ok=True)
+            (carpeta_temporada / "exportaciones").mkdir(exist_ok=True)
+
+            # Archivos auxiliares preparados para futuras funciones.
+            historial = carpeta_temporada / "historial.json"
+            produccion = carpeta_temporada / "produccion.json"
+
+            if not historial.exists():
+                historial.write_text(
+                    '{\n    "version": 1,\n    "modificaciones": []\n}',
+                    encoding="utf-8",
+                )
+
+            if not produccion.exists():
+                produccion.write_text(
+                    '{\n    "version": 1,\n    "fabricadas": []\n}',
+                    encoding="utf-8",
+                )
+
             shutil.copy2(plantilla, destino)
+
         except Exception as e:
             messagebox.showerror(
-                "Error al crear archivo",
-                f"No se pudo copiar la plantilla:\n\n{e}",
+                "Error al crear temporada",
+                f"No se pudo crear la carpeta de temporada:\n\n{e}",
             )
             return
 
@@ -377,7 +387,8 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
             "Temporada creada",
             (
                 "Temporada creada correctamente.\n\n"
-                f"Archivo:\n{destino}\n\n"
+                f"Carpeta:\n{carpeta_temporada}\n\n"
+                f"Excel:\n{destino}\n\n"
                 f"Medida estándar: {medida}"
             ),
         )
