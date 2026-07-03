@@ -2,10 +2,10 @@
 ==========================================================
 ARCHIVUM
 Pantalla: Medido
-Versión: 0.5.0
+Versión: 0.7.1
 ==========================================================
 
-Cambios v0.5.0:
+Cambios v0.7.1:\n- Corregida detección de temporada nueva: el tomo 1 vuelve a tener matriz inicial libre.\n\nCambios v0.5.0:
 - Botón BACKUP sustituido por CONTROL.
 - CONTROL abre Estado, Validación, Incidencias, Historial y Producción.
 
@@ -161,11 +161,16 @@ class PantallaMedido(ctk.CTkFrame):
 
         for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
             tomo = ws[f"{COL_TOMO}{fila}"].value
-            prot_final = ws[f"{COL_PROT_FINAL}{fila}"].value
-            fecha_final = ws[f"{COL_DATA_FINAL}{fila}"].value
 
-            if tomo not in (None, "") or prot_final not in (None, "") or fecha_final not in (None, ""):
-                ultima_fila_con_datos = fila
+            # Solo consideramos una fila como tomo real si la columna TOMO
+            # contiene un número. Esto evita que estilos, fórmulas o restos
+            # de la plantilla hagan creer a Archivum que ya hay tomos guardados.
+            try:
+                int(tomo)
+            except Exception:
+                continue
+
+            ultima_fila_con_datos = fila
 
         if ultima_fila_con_datos < FILA_INICIO_DATOS:
             self.tomo_actual = 1
@@ -270,7 +275,9 @@ class PantallaMedido(ctk.CTkFrame):
         for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
             tomo = ws[f"{COL_TOMO}{fila}"].value
 
-            if tomo in (None, ""):
+            try:
+                int(tomo)
+            except Exception:
                 continue
 
             filas.append({

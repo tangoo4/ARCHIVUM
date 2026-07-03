@@ -43,7 +43,6 @@ APP_AUTHOR = "Iván"
 # MODO PORTABLE USB
 # ==========================================================
 
-USB_DRIVE = Path("T:/")
 SYSTEM_FOLDER_NAME = "archivum_system"
 
 
@@ -103,6 +102,7 @@ RESIZABLE = True
 BASE_DIR = get_app_dir()
 RESOURCE_DIR = get_resource_dir()
 WORK_ROOT = get_work_root()
+OLIVERAS_DIR = WORK_ROOT / "OLIVERAS"
 
 # Carpeta técnica oculta
 DIR_SYSTEM = WORK_ROOT / SYSTEM_FOLDER_NAME
@@ -112,7 +112,7 @@ DIR_CORE = BASE_DIR / "core"
 DIR_UI = BASE_DIR / "ui"
 
 # Carpeta visible de trabajo
-DIR_TEMPORADAS = WORK_ROOT / "temporadas"
+DIR_TEMPORADAS = OLIVERAS_DIR / "temporadas"
 
 # Carpetas técnicas internas
 DIR_EXCEL = DIR_SYSTEM / "excel"
@@ -281,6 +281,7 @@ def ensure_project_dirs() -> None:
     DIR_SYSTEM.mkdir(exist_ok=True)
 
     for folder in (
+        OLIVERAS_DIR,
         DIR_EXCEL,
         DIR_ASSETS,
         DIR_LOGS,
