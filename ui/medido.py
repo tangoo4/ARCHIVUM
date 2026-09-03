@@ -27,6 +27,7 @@ from openpyxl.styles import Alignment, PatternFill
 from ui.control import VentanaControl
 from ui.foliado import VentanaFoliado
 from ui.modificar_tomo import VentanaModificarTomo
+from excel.gestor_cierre import cerrar_temporada, temporada_cerrada
 
 from config import (
     COLOR_BG,
@@ -421,7 +422,8 @@ class PantallaMedido(ctk.CTkFrame):
         self._boton_secundario(panel, "MODIFICAR TOMO", self._modificar_tomo).place(relx=0.83, y=82, anchor="center")
         self._boton_secundario(panel, "AÑADIR FOLIADO", self._foliado).place(relx=0.83, y=134, anchor="center")
         self._boton_secundario(panel, "CONTROL", self._control).place(relx=0.83, y=186, anchor="center")
-        self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=238, anchor="center")
+        self._boton_secundario(panel, "CERRAR TEMPORADA", self._cerrar_temporada).place(relx=0.83, y=238, anchor="center")
+        self._boton_secundario(panel, "VOLVER", self.app.mostrar_inicio).place(relx=0.95, y=238, anchor="center")
 
         self._autocompletar_matriz_inicio()
         self._autocompletar_fecha_inicio()
@@ -546,6 +548,60 @@ class PantallaMedido(ctk.CTkFrame):
             master=self,
             ruta_excel=self.ruta_excel,
             al_guardar=self._refrescar_tabla_desde_excel,
+        )
+
+    def _cerrar_temporada(self):
+        """Confirma y genera la línea visual de cierre de la temporada."""
+        if not self.ruta_excel or not self.ruta_excel.exists():
+            messagebox.showerror("Sin temporada", "No hay ningún Excel abierto.")
+            return
+
+        if self.tomo_actual == 1:
+            messagebox.showwarning(
+                "No se puede cerrar la temporada",
+                "Todavía no existen tomos medidos.",
+            )
+            return
+
+        if temporada_cerrada(self.ruta_excel):
+            messagebox.showwarning(
+                "Temporada ya cerrada",
+                "Esta temporada ya contiene una línea de cierre.\n\nNo se realizarán cambios.",
+            )
+            return
+
+        confirmar = messagebox.askyesno(
+            "Cerrar temporada",
+            "Se marcará como finalizado el medido de esta temporada.\n\n¿Deseas continuar?",
+            parent=self,
+        )
+        if not confirmar:
+            return
+
+        try:
+            cerrar_temporada(self.ruta_excel, self.contexto.notario)
+        except ValueError:
+            messagebox.showwarning(
+                "No se puede cerrar la temporada",
+                "Todavía no existen tomos medidos.",
+            )
+            return
+        except RuntimeError:
+            messagebox.showwarning(
+                "Temporada ya cerrada",
+                "Esta temporada ya contiene una línea de cierre.\n\nNo se realizarán cambios.",
+            )
+            return
+        except Exception as error:
+            messagebox.showerror(
+                "Error al cerrar temporada",
+                f"No se pudo guardar el cierre de la temporada:\n\n{error}",
+            )
+            return
+
+        messagebox.showinfo(
+            "Temporada cerrada",
+            "La temporada se ha cerrado correctamente.",
         )
 
     def _modificar_tomo(self):
@@ -822,6 +878,12 @@ class PantallaMedido(ctk.CTkFrame):
     # ======================================================
 
     def _guardar_tomo(self):
+        if self.ruta_excel and self.ruta_excel.exists() and temporada_cerrada(self.ruta_excel):
+            messagebox.showwarning(
+                "Temporada ya cerrada",
+                "Esta temporada ya contiene una línea de cierre.\n\nNo se pueden añadir nuevos tomos mientras exista el cierre.",
+            )
+            return
         ok, mensaje, campo = self._validar()
 
         if not ok:
