@@ -5,26 +5,16 @@ Configuración general de la aplicación
 Versión: 0.7.0
 ==========================================================
 
-Modo portable definitivo:
+Modo local portable:
 
-T:\
+ARCHIVUM/
 ├── ARCHIVUM.exe
-├── temporadas\
-└── archivum_system\   (oculta + sistema)
-    ├── assets\
-    ├── excel\
-    ├── datos\
-    ├── logs\
-    ├── backups\
-    └── temp\
+└── temporadas/
 
-El usuario solo debería ver:
-- ARCHIVUM.exe
-- temporadas
+La carpeta temporadas se crea siempre junto al ejecutable.
 """
 
 from pathlib import Path
-import subprocess
 import sys
 
 
@@ -40,10 +30,8 @@ APP_AUTHOR = "Iván"
 
 
 # ==========================================================
-# MODO PORTABLE USB
+# UBICACIÓN DE LA APLICACIÓN
 # ==========================================================
-
-SYSTEM_FOLDER_NAME = "archivum_system"
 
 
 def get_app_dir() -> Path:
@@ -69,19 +57,6 @@ def get_resource_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-def get_work_root() -> Path:
-    """
-    Si existe T:, Archivum trabaja siempre en T:.
-
-    Si no existe T:, trabaja junto al EXE o junto al proyecto.
-    Esto permite probar en VS Code sin USB.
-    """
-    if USB_DRIVE.exists():
-        return USB_DRIVE
-
-    return get_app_dir()
-
-
 # ==========================================================
 # VENTANA
 # ==========================================================
@@ -101,28 +76,24 @@ RESIZABLE = True
 
 BASE_DIR = get_app_dir()
 RESOURCE_DIR = get_resource_dir()
-WORK_ROOT = get_work_root()
-OLIVERAS_DIR = WORK_ROOT / "OLIVERAS"
-
-# Carpeta técnica oculta
-DIR_SYSTEM = WORK_ROOT / SYSTEM_FOLDER_NAME
+WORK_ROOT = BASE_DIR
 
 # Carpetas de código en desarrollo
 DIR_CORE = BASE_DIR / "core"
 DIR_UI = BASE_DIR / "ui"
 
-# Carpeta visible de trabajo
-DIR_TEMPORADAS = OLIVERAS_DIR / "temporadas"
+# Carpeta de trabajo, siempre junto a la aplicación
+DIR_TEMPORADAS = BASE_DIR / "temporadas"
 
-# Carpetas técnicas internas
-DIR_EXCEL = DIR_SYSTEM / "excel"
-DIR_ASSETS = DIR_SYSTEM / "assets"
-DIR_LOGS = DIR_SYSTEM / "logs"
-DIR_BACKUPS = DIR_SYSTEM / "backups"
-DIR_DATOS = DIR_SYSTEM / "datos"
-DIR_TEMP = DIR_SYSTEM / "temp"
+# Rutas reservadas para funciones futuras, también locales
+DIR_EXCEL = BASE_DIR / "excel"
+DIR_ASSETS = BASE_DIR / "assets"
+DIR_LOGS = BASE_DIR / "logs"
+DIR_BACKUPS = BASE_DIR / "backups"
+DIR_DATOS = BASE_DIR / "datos"
+DIR_TEMP = BASE_DIR / "temp"
 
-# Recursos externos opcionales dentro de archivum_system
+# Recursos externos opcionales en desarrollo
 LOGO_PATH = DIR_ASSETS / "logo.png"
 ICON_PATH = DIR_ASSETS / "archivum.ico"
 
@@ -131,7 +102,7 @@ BUNDLED_EXCEL_DIR = RESOURCE_DIR / "excel"
 BUNDLED_PLANTILLA_EXCEL = BUNDLED_EXCEL_DIR / "PLANTILLA_MEDIDO.xlsx"
 BUNDLED_PLANTILLA_EXCEL_ALT = BUNDLED_EXCEL_DIR / "plantilla.xlsx"
 
-# Plantilla externa opcional dentro de archivum_system/excel
+# Plantilla externa opcional junto al proyecto en desarrollo
 PLANTILLA_EXCEL = DIR_EXCEL / "PLANTILLA_MEDIDO.xlsx"
 PLANTILLA_EXCEL_ALT = DIR_EXCEL / "plantilla.xlsx"
 
@@ -244,54 +215,11 @@ BACKUP_DATETIME_FORMAT = "%Y%m%d_%H%M%S"
 # UTILIDADES
 # ==========================================================
 
-def _windows_hide_system_folder(path: Path) -> None:
-    """
-    Marca una carpeta como oculta y de sistema en Windows.
-
-    No requiere permisos de administrador.
-    Si falla, Archivum sigue funcionando igualmente.
-    """
-    if not sys.platform.startswith("win"):
-        return
-
-    try:
-        subprocess.run(
-            ["attrib", "+h", "+s", str(path)],
-            check=False,
-            shell=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception:
-        pass
-
-
 def ensure_project_dirs() -> None:
     """
-    Crea la estructura portable definitiva.
-
-    Visible:
-    - temporadas
-
-    Oculta:
-    - archivum_system
+    Crea la carpeta de temporadas junto al EXE o al proyecto.
     """
-    DIR_TEMPORADAS.mkdir(exist_ok=True)
-
-    DIR_SYSTEM.mkdir(exist_ok=True)
-
-    for folder in (
-        OLIVERAS_DIR,
-        DIR_EXCEL,
-        DIR_ASSETS,
-        DIR_LOGS,
-        DIR_BACKUPS,
-        DIR_DATOS,
-        DIR_TEMP,
-    ):
-        folder.mkdir(parents=True, exist_ok=True)
-
-    _windows_hide_system_folder(DIR_SYSTEM)
+    DIR_TEMPORADAS.mkdir(parents=True, exist_ok=True)
 
 
 def get_plantilla_path() -> Path | None:
@@ -300,7 +228,7 @@ def get_plantilla_path() -> Path | None:
 
     Prioridad:
     1. Plantilla incluida dentro del EXE.
-    2. Plantilla externa en archivum_system/excel.
+    2. Plantilla externa en la carpeta excel del proyecto.
 
     Así, en la versión final, el usuario no necesita tener ni tocar
     la carpeta excel ni la plantilla.
@@ -324,7 +252,4 @@ def modo_trabajo_texto() -> str:
     """
     Texto breve para saber dónde está trabajando Archivum.
     """
-    if USB_DRIVE.exists():
-        return f"USB detectado: {USB_DRIVE}"
-
-    return f"Modo local: {WORK_ROOT}"
+    return f"Carpeta de la aplicación: {WORK_ROOT}"

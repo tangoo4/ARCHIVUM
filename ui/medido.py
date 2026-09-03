@@ -25,6 +25,8 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment, PatternFill
 
 from ui.control import VentanaControl
+from ui.foliado import VentanaFoliado
+from ui.modificar_tomo import VentanaModificarTomo
 
 from config import (
     COLOR_BG,
@@ -415,9 +417,11 @@ class PantallaMedido(ctk.CTkFrame):
         self.mensaje = ctk.CTkLabel(panel, text="", font=FONT_SUBTITLE, text_color=COLOR_GREEN)
         self.mensaje.place(x=35, y=245)
 
-        self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=70, anchor="center")
-        self._boton_secundario(panel, "CONTROL", self._control).place(relx=0.83, y=130, anchor="center")
-        self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=190, anchor="center")
+        self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=30, anchor="center")
+        self._boton_secundario(panel, "MODIFICAR TOMO", self._modificar_tomo).place(relx=0.83, y=82, anchor="center")
+        self._boton_secundario(panel, "AÑADIR FOLIADO", self._foliado).place(relx=0.83, y=134, anchor="center")
+        self._boton_secundario(panel, "CONTROL", self._control).place(relx=0.83, y=186, anchor="center")
+        self._boton_secundario(panel, "CERRAR", self.app.mostrar_inicio).place(relx=0.83, y=238, anchor="center")
 
         self._autocompletar_matriz_inicio()
         self._autocompletar_fecha_inicio()
@@ -531,6 +535,37 @@ class PantallaMedido(ctk.CTkFrame):
             font=FONT_NORMAL,
             corner_radius=10,
         )
+
+    def _foliado(self):
+        """Abre el formulario independiente de foliado de la temporada."""
+        if not self.ruta_excel or not self.ruta_excel.exists():
+            messagebox.showerror("Sin temporada", "No hay ningún Excel abierto.")
+            return
+
+        VentanaFoliado(
+            master=self,
+            ruta_excel=self.ruta_excel,
+            al_guardar=self._refrescar_tabla_desde_excel,
+        )
+
+    def _modificar_tomo(self):
+        """Abre el formulario de corrección de tomos anteriores."""
+        if not self.ruta_excel or not self.ruta_excel.exists():
+            messagebox.showerror("Sin temporada", "No hay ningún Excel abierto.")
+            return
+
+        VentanaModificarTomo(
+            master=self,
+            ruta_excel=self.ruta_excel,
+            medida_estandar=self.medida_estandar,
+            al_guardar=self._recargar_despues_de_modificar,
+        )
+
+    def _recargar_despues_de_modificar(self):
+        self._cargar_estado_excel()
+        self._actualizar_tomo()
+        self._actualizar_matriz_esperada()
+        self._refrescar_tabla_desde_excel()
 
     # ======================================================
     # TABLA
