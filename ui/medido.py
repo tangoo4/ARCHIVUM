@@ -24,7 +24,7 @@ import customtkinter as ctk
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, PatternFill
 
-from ui.control import VentanaControl
+from ui.control import PanelControl
 from ui.foliado import VentanaFoliado
 from ui.modificar_tomo import VentanaModificarTomo
 from excel.gestor_cierre import cerrar_temporada, temporada_cerrada
@@ -302,13 +302,38 @@ class PantallaMedido(ctk.CTkFrame):
 
     def _crear_interfaz(self):
         self._crear_cabecera()
+        self._crear_selector_area()
+
+        self.area_contenido = ctk.CTkFrame(self, fg_color="transparent")
+        self.area_contenido.pack(fill="both", expand=True)
+
+        self.area_medido = ctk.CTkFrame(self.area_contenido, fg_color="transparent")
+        self.area_medido.pack(fill="both", expand=True)
+
+        self.area_control = None
+
+        self._crear_barra_acciones()
         self._crear_panel_entrada()
         self._crear_panel_tabla()
+
         self.matriz_inicio.focus_set()
 
     def _crear_cabecera(self):
         cabecera = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=90, corner_radius=0)
         cabecera.pack(fill="x")
+
+        ctk.CTkButton(
+            cabecera,
+            text="‹ VOLVER",
+            command=self.app.mostrar_inicio,
+            width=95,
+            height=34,
+            fg_color="transparent",
+            hover_color=COLOR_PANEL_2,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=8,
+        ).place(x=22, y=13)
 
         archivo = str(self.ruta_excel) if self.ruta_excel else "SIN ARCHIVO"
 
@@ -317,14 +342,14 @@ class PantallaMedido(ctk.CTkFrame):
             text=f"ARCHIVO: {archivo}",
             font=FONT_SUBTITLE,
             text_color=COLOR_TEXT,
-        ).place(x=30, y=14)
+        ).place(x=130, y=17)
 
         ctk.CTkLabel(
             cabecera,
             text="● GUARDADO",
             font=FONT_NORMAL,
             text_color=COLOR_GREEN,
-        ).place(x=30, y=52)
+        ).place(x=130, y=52)
 
         info = (
             f"TIPO: {self.contexto.tipo or '-'}    "
@@ -352,9 +377,126 @@ class PantallaMedido(ctk.CTkFrame):
             justify="left",
         ).place(x=15, y=7)
 
+    def _crear_selector_area(self):
+        selector = ctk.CTkFrame(self, fg_color=COLOR_BG, height=48)
+        selector.pack(fill="x", padx=25, pady=(12, 0))
+
+        self.boton_area_medido = ctk.CTkButton(
+            selector,
+            text="MEDIDO",
+            command=lambda: self._mostrar_area("medido"),
+            width=145,
+            height=38,
+            fg_color=COLOR_GREEN,
+            hover_color=COLOR_GREEN,
+            text_color=COLOR_TEXT,
+            font=("Segoe UI", 14, "bold"),
+            corner_radius=9,
+        )
+        self.boton_area_medido.pack(side="left")
+
+        self.boton_area_control = ctk.CTkButton(
+            selector,
+            text="CONTROL",
+            command=lambda: self._mostrar_area("control"),
+            width=145,
+            height=38,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=("Segoe UI", 14, "bold"),
+            corner_radius=9,
+        )
+        self.boton_area_control.pack(side="left", padx=(8, 0))
+
+    def _mostrar_area(self, area):
+        if area == "control":
+            self.area_medido.pack_forget()
+
+            if self.area_control is None:
+                self.area_control = PanelControl(self.area_contenido, self.app)
+
+            self.area_control.pack(fill="both", expand=True)
+            self.boton_area_medido.configure(
+                fg_color=COLOR_PANEL_2,
+                hover_color=COLOR_BORDER,
+            )
+            self.boton_area_control.configure(
+                fg_color=COLOR_GREEN,
+                hover_color=COLOR_GREEN,
+            )
+            return
+
+        if self.area_control is not None:
+            self.area_control.pack_forget()
+
+        self.area_medido.pack(fill="both", expand=True)
+        self.boton_area_medido.configure(
+            fg_color=COLOR_GREEN,
+            hover_color=COLOR_GREEN,
+        )
+        self.boton_area_control.configure(
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+        )
+        self.matriz_inicio.focus_set()
+
+    def _crear_barra_acciones(self):
+        barra = ctk.CTkFrame(
+            self.area_medido,
+            fg_color=COLOR_PANEL,
+            border_width=1,
+            border_color=COLOR_BORDER,
+            corner_radius=12,
+            height=58,
+        )
+        barra.pack(fill="x", padx=25, pady=(12, 0))
+        barra.pack_propagate(False)
+
+        ctk.CTkButton(
+            barra,
+            text="MODIFICAR TOMO",
+            command=self._modificar_tomo,
+            width=165,
+            height=36,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=9,
+        ).pack(side="left", padx=(14, 7), pady=10)
+
+        ctk.CTkButton(
+            barra,
+            text="AÑADIR FOLIADO",
+            command=self._foliado,
+            width=165,
+            height=36,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=9,
+        ).pack(side="left", padx=7, pady=10)
+
+        ctk.CTkButton(
+            barra,
+            text="CERRAR TEMPORADA",
+            command=self._cerrar_temporada,
+            width=175,
+            height=36,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            border_width=1,
+            border_color=COLOR_RED,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=9,
+        ).pack(side="right", padx=14, pady=10)
+
     def _crear_panel_entrada(self):
         panel = ctk.CTkFrame(
-            self,
+            self.area_medido,
             fg_color=COLOR_PANEL,
             border_width=1,
             border_color=COLOR_BORDER,
@@ -418,19 +560,12 @@ class PantallaMedido(ctk.CTkFrame):
         self.mensaje = ctk.CTkLabel(panel, text="", font=FONT_SUBTITLE, text_color=COLOR_GREEN)
         self.mensaje.place(x=35, y=245)
 
-        self._boton_secundario(panel, "BUSCADOR", self._buscador).place(relx=0.83, y=30, anchor="center")
-        self._boton_secundario(panel, "MODIFICAR TOMO", self._modificar_tomo).place(relx=0.83, y=82, anchor="center")
-        self._boton_secundario(panel, "AÑADIR FOLIADO", self._foliado).place(relx=0.83, y=134, anchor="center")
-        self._boton_secundario(panel, "CONTROL", self._control).place(relx=0.83, y=186, anchor="center")
-        self._boton_secundario(panel, "CERRAR TEMPORADA", self._cerrar_temporada).place(relx=0.83, y=238, anchor="center")
-        self._boton_secundario(panel, "VOLVER", self.app.mostrar_inicio).place(relx=0.95, y=238, anchor="center")
-
         self._autocompletar_matriz_inicio()
         self._autocompletar_fecha_inicio()
 
     def _crear_panel_tabla(self):
         panel = ctk.CTkFrame(
-            self,
+            self.area_medido,
             fg_color=COLOR_PANEL,
             border_width=1,
             border_color=COLOR_BORDER,
@@ -438,12 +573,29 @@ class PantallaMedido(ctk.CTkFrame):
         )
         panel.pack(fill="both", expand=True, padx=25, pady=(10, 20))
 
+        cabecera_excel = ctk.CTkFrame(panel, fg_color="transparent", height=48)
+        cabecera_excel.pack(fill="x", padx=20, pady=(8, 4))
+        cabecera_excel.pack_propagate(False)
+
         ctk.CTkLabel(
-            panel,
+            cabecera_excel,
             text="VISTA COMPLETA DEL EXCEL",
             font=FONT_SUBTITLE,
             text_color=COLOR_TEXT,
-        ).pack(anchor="w", padx=20, pady=(15, 10))
+        ).pack(side="left", pady=10)
+
+        ctk.CTkButton(
+            cabecera_excel,
+            text="🔍",
+            command=self._buscador,
+            width=42,
+            height=34,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=("Segoe UI Emoji", 16),
+            corner_radius=8,
+        ).pack(side="right", pady=7)
 
         contenedor = ctk.CTkFrame(panel, fg_color=COLOR_PANEL_2, corner_radius=10)
         contenedor.pack(fill="both", expand=True, padx=20, pady=(0, 20))
@@ -978,5 +1130,3 @@ class PantallaMedido(ctk.CTkFrame):
     def _buscador(self):
         messagebox.showinfo("Buscador", "Buscador pendiente.")
 
-    def _control(self):
-        VentanaControl(self, self.app)

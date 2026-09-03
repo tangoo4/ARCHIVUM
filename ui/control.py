@@ -57,13 +57,13 @@ COL_GRUIX = "G"
 COL_OBSERVACIONS = "H"
 
 
-class VentanaControl(ctk.CTkToplevel):
+class PanelControl(ctk.CTkFrame):
     """
-    Ventana de control de temporada.
+    Área de Control integrada en el espacio de trabajo de la temporada.
     """
 
     def __init__(self, master, app):
-        super().__init__(master)
+        super().__init__(master, fg_color=COLOR_BG)
 
         self.app = app
         self.contexto = app.contexto
@@ -75,14 +75,6 @@ class VentanaControl(ctk.CTkToplevel):
         self.medida_estandar = self.contexto.medida_estandar or "8,5"
         self.filas = self._leer_excel()
         self.produccion = self._leer_produccion()
-
-        self.title("ARCHIVUM - Control")
-        self.geometry("1100x720")
-        self.minsize(1000, 650)
-        self.configure(fg_color=COLOR_BG)
-
-        self.transient(master)
-        self.grab_set()
 
         self._crear_interfaz()
 
@@ -170,8 +162,6 @@ class VentanaControl(ctk.CTkToplevel):
     # ======================================================
 
     def _crear_interfaz(self):
-        self._crear_cabecera()
-
         self.tabs = ctk.CTkTabview(
             self,
             fg_color=COLOR_PANEL,
