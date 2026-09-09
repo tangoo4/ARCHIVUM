@@ -10,8 +10,8 @@ from openpyxl.styles import Alignment, PatternFill
 FILA_INICIO_DATOS = 2
 COLUMNAS_TOMO = "ABCDEFGH"
 
-FILL_ROJO = PatternFill("solid", fgColor="FF3030")
-FILL_AMARILLO = PatternFill("solid", fgColor="FFE600")
+FILL_ROJO = PatternFill("solid", fgColor="FFC7CE")
+FILL_AMARILLO = PatternFill("solid", fgColor="FFEB9C")
 FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
 ALINEACION_CENTRADA = Alignment(horizontal="center", vertical="center")
 
@@ -101,14 +101,20 @@ def modificar_tomo(ruta_excel, tomo, datos, medida_estandar):
     medida = datos["medida"]
     if medida == "?":
         fill = FILL_AMARILLO
+        color_texto = "9C5700"
     elif medida != medida_estandar:
         fill = FILL_ROJO
+        color_texto = "9C0006"
     else:
         fill = FILL_BLANCO
+        color_texto = "000000"
 
     for columna in COLUMNAS_TOMO:
         celda = ws[f"{columna}{fila_objetivo}"]
         celda.fill = copy.copy(fill)
+        fuente = copy.copy(celda.font)
+        fuente.color = color_texto
+        celda.font = fuente
         celda.alignment = copy.copy(ALINEACION_CENTRADA)
 
     wb.save(ruta_excel)

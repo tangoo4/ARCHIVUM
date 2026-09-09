@@ -11,6 +11,8 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox, simpledialog
 from pathlib import Path
 
+from core.nomenclatura import extraer_datos_desde_nombre
+
 from config import (
     APP_NAME,
     APP_SUBTITLE,
@@ -21,6 +23,7 @@ from config import (
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
     COLOR_GREEN,
+    COLOR_GREEN_TEXT,
     COLOR_GREEN_HOVER,
     COLOR_CYAN,
     FONT_TITLE,
@@ -95,7 +98,7 @@ class PantallaInicio(ctk.CTkFrame):
             height=55,
             fg_color=COLOR_GREEN,
             hover_color=COLOR_GREEN_HOVER,
-            text_color="black",
+            text_color=COLOR_GREEN_TEXT,
             font=("Segoe UI", 17, "bold"),
         )
 
@@ -144,31 +147,12 @@ class PantallaInicio(ctk.CTkFrame):
         return 0 < valor <= 10
 
     def _rellenar_contexto_desde_nombre(self, archivo):
-        """
-        Intenta deducir tipo, notario y año desde nombres tipo:
-        PROTOCOLO_PEREZ_2025.xlsx
-        POLIZAS_PEREZ_2025.xlsx
-        LIBRO_INDICADOR_PEREZ_2025.xlsx
-        """
-
-        nombre = Path(archivo).stem
-        partes = nombre.split("_")
-
-        if len(partes) < 3:
+        """Rellena el contexto sin renombrar la temporada existente."""
+        datos = extraer_datos_desde_nombre(archivo)
+        if datos is None:
             return
 
-        anio = partes[-1]
-
-        if not anio.isdigit():
-            return
-
-        if partes[0] == "LIBRO" and len(partes) >= 4 and partes[1] == "INDICADOR":
-            tipo = "LIBRO INDICADOR"
-            notario = "_".join(partes[2:-1])
-        else:
-            tipo = partes[0]
-            notario = "_".join(partes[1:-1])
-
+        tipo, notario, anio = datos
         self.app.contexto.tipo = tipo
         self.app.contexto.notario = notario
         self.app.contexto.anio = anio

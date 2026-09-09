@@ -37,6 +37,7 @@ from config import (
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
     COLOR_GREEN,
+    COLOR_GREEN_TEXT,
     COLOR_CYAN,
     COLOR_RED,
     COLOR_YELLOW,
@@ -477,7 +478,7 @@ class PanelControl(ctk.CTkFrame):
             text="COPIAR MATRICES",
             command=self._copiar_matrices,
             fg_color=COLOR_GREEN,
-            text_color="black",
+            text_color=COLOR_GREEN_TEXT,
             hover_color=COLOR_GREEN,
             height=38,
         ).pack(side="left", padx=(0, 10))
@@ -672,7 +673,7 @@ class PanelControl(ctk.CTkFrame):
             command=self._toggle_tapa_seleccionada,
             fg_color=COLOR_GREEN,
             hover_color=COLOR_GREEN,
-            text_color="black",
+            text_color=COLOR_GREEN_TEXT,
             height=38,
         ).pack(side="left", padx=(0, 10))
 

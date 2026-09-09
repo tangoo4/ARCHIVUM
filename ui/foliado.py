@@ -9,6 +9,7 @@ from config import (
     COLOR_BORDER,
     COLOR_CYAN,
     COLOR_GREEN,
+    COLOR_GREEN_TEXT,
     COLOR_GREEN_HOVER,
     COLOR_PANEL,
     COLOR_PANEL_2,
@@ -94,7 +95,7 @@ class VentanaFoliado(ctk.CTkToplevel):
         ctk.CTkButton(
             panel, text="GUARDAR Y SIGUIENTE", command=self._guardar,
             width=190, height=40, fg_color=COLOR_GREEN,
-            hover_color=COLOR_GREEN_HOVER, text_color="black",
+            hover_color=COLOR_GREEN_HOVER, text_color=COLOR_GREEN_TEXT,
             font=("Segoe UI", 13, "bold"),
         ).place(relx=0.82, y=25, anchor="n")
         ctk.CTkButton(

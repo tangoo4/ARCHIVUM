@@ -27,7 +27,6 @@ import customtkinter as ctk
 from tkinter import messagebox
 from pathlib import Path
 import shutil
-import unicodedata
 
 from config import (
     COLOR_BG,
@@ -37,6 +36,7 @@ from config import (
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
     COLOR_GREEN,
+    COLOR_GREEN_TEXT,
     COLOR_GREEN_HOVER,
     COLOR_CYAN,
     FONT_TITLE,
@@ -49,21 +49,7 @@ from config import (
     get_plantilla_path,
 )
 
-
-def limpiar_nombre(texto: str) -> str:
-    """
-    Convierte un texto en formato seguro para nombre de archivo.
-
-    Ejemplo:
-    Salvador Farrés Ripoll -> SALVADOR_FARRES_RIPOLL
-    """
-
-    texto = texto.strip().upper()
-    texto = unicodedata.normalize("NFD", texto)
-    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
-    texto = texto.replace(" ", "_")
-    texto = "".join(c for c in texto if c.isalnum() or c == "_")
-    return texto
+from core.nomenclatura import construir_nombre_base, normalizar_espacios
 
 
 class PantallaNuevaTemporada(ctk.CTkFrame):
@@ -226,7 +212,7 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
             height=50,
             fg_color=COLOR_GREEN,
             hover_color=COLOR_GREEN_HOVER,
-            text_color="black",
+            text_color=COLOR_GREEN_TEXT,
             font=FONT_BUTTON,
             corner_radius=12,
         )
@@ -323,13 +309,12 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
             )
             return
 
-        tipo = self.tipo.get().strip().upper()
-        tipo_archivo = limpiar_nombre(tipo)
-        notario_limpio = limpiar_nombre(self.notario.get())
-        anio = self.anio.get().strip()
+        tipo = normalizar_espacios(self.tipo.get()).upper()
+        notario = normalizar_espacios(self.notario.get()).upper()
+        anio = normalizar_espacios(self.anio.get())
         medida = self.medida.get().strip()
 
-        nombre_base = f"{tipo_archivo}_{notario_limpio}_{anio}"
+        nombre_base = construir_nombre_base(tipo, notario, anio)
         nombre_archivo = f"{nombre_base}.xlsx"
 
         carpeta_temporada = DIR_TEMPORADAS / nombre_base
@@ -377,7 +362,7 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
             return
 
         self.app.contexto.tipo = tipo
-        self.app.contexto.notario = notario_limpio
+        self.app.contexto.notario = notario
         self.app.contexto.anio = anio
         self.app.contexto.medida_estandar = medida
         self.app.contexto.archivo_actual = str(destino)

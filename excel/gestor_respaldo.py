@@ -5,6 +5,8 @@ import shutil
 
 from openpyxl import load_workbook
 
+from core.nomenclatura import obtener_nombre_base
+
 
 FILA_INICIO_DATOS = 2
 COL_TOMO = "A"
@@ -15,7 +17,8 @@ CARPETA_RESPALDO = "respaldo"
 def _ruta_respaldo(ruta_excel, nombre):
     ruta_excel = Path(ruta_excel)
     carpeta = ruta_excel.parent / CARPETA_RESPALDO
-    return carpeta / f"{ruta_excel.stem}_{nombre}{ruta_excel.suffix}"
+    nombre_base = obtener_nombre_base(ruta_excel)
+    return carpeta / f"{nombre_base} {nombre}{ruta_excel.suffix}"
 
 
 def _copiar_si_no_existe(ruta_excel, ruta_destino):
@@ -71,5 +74,5 @@ def crear_respaldo_final(ruta_excel):
     if ultimo_tomo is None:
         raise ValueError("Todavía no existen tomos medidos.")
 
-    destino = _ruta_respaldo(ruta_excel, f"FINAL_T{ultimo_tomo:03d}")
+    destino = _ruta_respaldo(ruta_excel, f"FINAL T{ultimo_tomo:03d}")
     return _copiar_si_no_existe(ruta_excel, destino)

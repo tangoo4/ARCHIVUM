@@ -38,9 +38,12 @@ from config import (
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
     COLOR_GREEN,
+    COLOR_GREEN_TEXT,
     COLOR_CYAN,
     COLOR_RED,
+    COLOR_RED_TEXT,
     COLOR_YELLOW,
+    COLOR_YELLOW_TEXT,
     FONT_SUBTITLE,
     FONT_NORMAL,
     FONT_TOMO,
@@ -72,8 +75,8 @@ COLUMNAS_COLOR_FILA = [
     COL_OBSERVACIONS,
 ]
 
-FILL_ROJO = PatternFill("solid", fgColor="FF3030")
-FILL_AMARILLO = PatternFill("solid", fgColor="FFE600")
+FILL_ROJO = PatternFill("solid", fgColor="FFC7CE")
+FILL_AMARILLO = PatternFill("solid", fgColor="FFEB9C")
 FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
 
 ALINEACION_CENTRADA = Alignment(horizontal="center", vertical="center")
@@ -258,13 +261,20 @@ class PantallaMedido(ctk.CTkFrame):
     def _aplicar_color_fila(self, ws, fila, medida):
         if medida == "?":
             fill = FILL_AMARILLO
+            color_texto = "9C5700"
         elif medida != self.medida_estandar:
             fill = FILL_ROJO
+            color_texto = "9C0006"
         else:
             fill = FILL_BLANCO
+            color_texto = "000000"
 
         for columna in COLUMNAS_COLOR_FILA:
-            ws[f"{columna}{fila}"].fill = copy.copy(fill)
+            celda = ws[f"{columna}{fila}"]
+            celda.fill = copy.copy(fill)
+            fuente = copy.copy(celda.font)
+            fuente.color = color_texto
+            celda.font = fuente
 
     def _centrar_fila(self, ws, fila):
         for columna in COLUMNAS_COLOR_FILA:
@@ -391,7 +401,7 @@ class PantallaMedido(ctk.CTkFrame):
             height=34,
             fg_color=COLOR_GREEN,
             hover_color=COLOR_GREEN,
-            text_color=COLOR_TEXT,
+            text_color=COLOR_GREEN_TEXT,
             font=("Segoe UI", 14, "bold"),
             corner_radius=9,
         )
@@ -422,10 +432,12 @@ class PantallaMedido(ctk.CTkFrame):
             self.boton_area_medido.configure(
                 fg_color=COLOR_PANEL_2,
                 hover_color=COLOR_BORDER,
+                text_color=COLOR_TEXT,
             )
             self.boton_area_control.configure(
                 fg_color=COLOR_GREEN,
                 hover_color=COLOR_GREEN,
+                text_color=COLOR_GREEN_TEXT,
             )
             return
 
@@ -436,10 +448,12 @@ class PantallaMedido(ctk.CTkFrame):
         self.boton_area_medido.configure(
             fg_color=COLOR_GREEN,
             hover_color=COLOR_GREEN,
+            text_color=COLOR_GREEN_TEXT,
         )
         self.boton_area_control.configure(
             fg_color=COLOR_PANEL_2,
             hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
         )
         self.matriz_inicio.focus_set()
 
@@ -851,8 +865,8 @@ class PantallaMedido(ctk.CTkFrame):
         style.map("Treeview", background=[("selected", "#003C5A")])
 
         self.tabla.tag_configure("normal", background="#181818", foreground=COLOR_TEXT)
-        self.tabla.tag_configure("especial", background=COLOR_RED, foreground="#FFFFFF")
-        self.tabla.tag_configure("interrogante", background=COLOR_YELLOW, foreground="#000000")
+        self.tabla.tag_configure("especial", background=COLOR_RED, foreground=COLOR_RED_TEXT)
+        self.tabla.tag_configure("interrogante", background=COLOR_YELLOW, foreground=COLOR_YELLOW_TEXT)
         self.tabla.tag_configure("busqueda", background="#39FF14", foreground="#000000")
 
     def _refrescar_tabla_desde_excel(self):

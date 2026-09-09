@@ -8,7 +8,7 @@ FILA_INICIO_DATOS = 2
 COL_TOMO = "A"
 COL_CIERRE_INICIO = "C"
 COL_CIERRE_FIN = "D"
-FILL_CIERRE = PatternFill("solid", fgColor="FFE600")
+FILL_CIERRE = PatternFill("solid", fgColor="FFEB9C")
 
 
 def buscar_ultima_fila_tomo(ws):
@@ -62,6 +62,7 @@ def cerrar_temporada(ruta_excel, notario):
     borde_d = copy.copy(ws[f"D{ultima_fila}"].border)
     alineacion = copy.copy(ws[f"C{ultima_fila}"].alignment)
     fuente = copy.copy(ws[f"C{ultima_fila}"].font)
+    fuente.color = "9C5700"
 
     ws.merge_cells(rango)
     celda = ws[f"C{fila_cierre}"]

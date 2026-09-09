@@ -5,7 +5,7 @@ from tkinter import messagebox, ttk
 import customtkinter as ctk
 
 from config import (
-    COLOR_BG, COLOR_BORDER, COLOR_CYAN, COLOR_GREEN, COLOR_GREEN_HOVER,
+    COLOR_BG, COLOR_BORDER, COLOR_CYAN, COLOR_GREEN, COLOR_GREEN_HOVER, COLOR_GREEN_TEXT,
     COLOR_PANEL, COLOR_PANEL_2, COLOR_TEXT, COLOR_TEXT_MUTED,
     FONT_NORMAL, FONT_SUBTITLE, MAX_MEDIDA, MAX_OBSERVACIONES,
 )
@@ -93,7 +93,7 @@ class VentanaModificarTomo(ctk.CTkToplevel):
         ).pack(side="right", padx=(10, 0))
         ctk.CTkButton(
             botones, text="GUARDAR CAMBIOS", command=self._guardar, width=190, height=42,
-            fg_color=COLOR_GREEN, hover_color=COLOR_GREEN_HOVER, text_color="black",
+            fg_color=COLOR_GREEN, hover_color=COLOR_GREEN_HOVER, text_color=COLOR_GREEN_TEXT,
             font=("Segoe UI", 13, "bold"),
         ).pack(side="right")
 
