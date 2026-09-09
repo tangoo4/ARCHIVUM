@@ -1,9 +1,24 @@
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
 
-*.pyc
+# Entornos virtuales
+.venv/
+venv/
+env/
 
+# PyInstaller: salidas generadas
+build/
 dist/
 
-build/
+# Temporales y sistema
+*.tmp
+*.temp
+~$*
+.DS_Store
+Thumbs.db
 
-*.spec
+# Temporadas de trabajo locales
+temporadas/*
+!temporadas/.gitkeep
