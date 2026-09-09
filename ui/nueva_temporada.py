@@ -50,6 +50,7 @@ from config import (
 )
 
 from core.nomenclatura import construir_nombre_base, normalizar_espacios
+from core.validaciones import formatear_medida, normalizar_anio, normalizar_medida
 
 
 class PantallaNuevaTemporada(ctk.CTkFrame):
@@ -257,8 +258,10 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
         if not notario:
             return False, "Introduce el nombre del notario."
 
-        if not anio.isdigit() or len(anio) != 4:
-            return False, "El año debe tener 4 dígitos."
+        try:
+            normalizar_anio(anio)
+        except ValueError:
+            return False, "El año debe ser un número entero."
 
         if not self._validar_medida(medida):
             return False, "La medida debe ser un número máximo 10. Usa coma si hay decimal."
@@ -312,7 +315,7 @@ class PantallaNuevaTemporada(ctk.CTkFrame):
         tipo = normalizar_espacios(self.tipo.get()).upper()
         notario = normalizar_espacios(self.notario.get()).upper()
         anio = normalizar_espacios(self.anio.get())
-        medida = self.medida.get().strip()
+        medida = formatear_medida(normalizar_medida(self.medida.get().strip(), 10))
 
         nombre_base = construir_nombre_base(tipo, notario, anio)
         nombre_archivo = f"{nombre_base}.xlsx"

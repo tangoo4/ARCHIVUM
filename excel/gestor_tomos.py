@@ -6,10 +6,14 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, PatternFill
 
+from core.validaciones import normalizar_anio, normalizar_medida
+from config import MAX_MEDIDA
+
 
 FILA_INICIO_DATOS = 2
 COLUMNAS_TOMO = "ABCDEFGH"
 
+FILL_VERDE = PatternFill("solid", fgColor="C6EFCE")
 FILL_ROJO = PatternFill("solid", fgColor="FFC7CE")
 FILL_AMARILLO = PatternFill("solid", fgColor="FFEB9C")
 FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
@@ -87,12 +91,12 @@ def modificar_tomo(ruta_excel, tomo, datos, medida_estandar):
 
     valores = (
         int(tomo),
-        datos["anio"],
+        normalizar_anio(datos["anio"]),
         int(datos["matriz_inicio"]),
         datos["fecha_inicio"],
         int(datos["matriz_final"]),
         datos["fecha_final"],
-        datos["medida"],
+        normalizar_medida(datos["medida"], MAX_MEDIDA),
         datos["observaciones"],
     )
     for columna, valor in zip(COLUMNAS_TOMO, valores):
@@ -102,12 +106,10 @@ def modificar_tomo(ruta_excel, tomo, datos, medida_estandar):
     if medida == "?":
         fill = FILL_AMARILLO
         color_texto = "9C5700"
-    elif medida != medida_estandar:
-        fill = FILL_ROJO
-        color_texto = "9C0006"
     else:
-        fill = FILL_BLANCO
-        color_texto = "000000"
+        fill = FILL_VERDE
+        color_texto = "006100"
+        ws[f"G{fila_objetivo}"].number_format = "0.0"
 
     for columna in COLUMNAS_TOMO:
         celda = ws[f"{columna}{fila_objetivo}"]

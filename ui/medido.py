@@ -29,6 +29,7 @@ from ui.foliado import VentanaFoliado
 from ui.modificar_tomo import VentanaModificarTomo
 from excel.gestor_cierre import cerrar_temporada, temporada_cerrada
 from excel.gestor_respaldo import crear_respaldo_final, crear_respaldo_periodico
+from core.validaciones import formatear_medida, normalizar_anio, normalizar_medida
 
 from config import (
     COLOR_BG,
@@ -75,6 +76,7 @@ COLUMNAS_COLOR_FILA = [
     COL_OBSERVACIONS,
 ]
 
+FILL_VERDE = PatternFill("solid", fgColor="C6EFCE")
 FILL_ROJO = PatternFill("solid", fgColor="FFC7CE")
 FILL_AMARILLO = PatternFill("solid", fgColor="FFEB9C")
 FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
@@ -218,12 +220,14 @@ class PantallaMedido(ctk.CTkFrame):
         self._copiar_estilo_base(ws, fila)
 
         ws[f"{COL_TOMO}{fila}"] = datos["tomo"]
-        ws[f"{COL_ANY}{fila}"] = datos["anio"]
+        ws[f"{COL_ANY}{fila}"] = normalizar_anio(datos["anio"])
         ws[f"{COL_PROT_INICIAL}{fila}"] = int(datos["matriz_inicio"])
         ws[f"{COL_DATA_INICIAL}{fila}"] = datos["fecha_inicio"]
         ws[f"{COL_PROT_FINAL}{fila}"] = int(datos["matriz_final"])
         ws[f"{COL_DATA_FINAL}{fila}"] = datos["fecha_final"]
-        ws[f"{COL_GRUIX}{fila}"] = datos["medida"]
+        ws[f"{COL_GRUIX}{fila}"] = normalizar_medida(datos["medida"], MAX_MEDIDA)
+        if datos["medida"] != "?":
+            ws[f"{COL_GRUIX}{fila}"].number_format = "0.0"
         ws[f"{COL_OBSERVACIONS}{fila}"] = datos["observaciones"]
 
         self._aplicar_color_fila(ws, fila, datos["medida"])
@@ -262,12 +266,9 @@ class PantallaMedido(ctk.CTkFrame):
         if medida == "?":
             fill = FILL_AMARILLO
             color_texto = "9C5700"
-        elif medida != self.medida_estandar:
-            fill = FILL_ROJO
-            color_texto = "9C0006"
         else:
-            fill = FILL_BLANCO
-            color_texto = "000000"
+            fill = FILL_VERDE
+            color_texto = "006100"
 
         for columna in COLUMNAS_COLOR_FILA:
             celda = ws[f"{columna}{fila}"]
@@ -865,6 +866,7 @@ class PantallaMedido(ctk.CTkFrame):
         style.map("Treeview", background=[("selected", "#003C5A")])
 
         self.tabla.tag_configure("normal", background="#181818", foreground=COLOR_TEXT)
+        self.tabla.tag_configure("resuelta", background=COLOR_GREEN, foreground=COLOR_GREEN_TEXT)
         self.tabla.tag_configure("especial", background=COLOR_RED, foreground=COLOR_RED_TEXT)
         self.tabla.tag_configure("interrogante", background=COLOR_YELLOW, foreground=COLOR_YELLOW_TEXT)
         self.tabla.tag_configure("busqueda", background="#39FF14", foreground="#000000")
@@ -889,7 +891,7 @@ class PantallaMedido(ctk.CTkFrame):
                     fila["fecha_inicio"],
                     fila["matriz_final"],
                     fila["fecha_final"],
-                    fila["medida"],
+                    formatear_medida(fila["medida"]),
                     fila["observaciones"],
                 ),
                 tags=(tag,),
@@ -1081,15 +1083,11 @@ class PantallaMedido(ctk.CTkFrame):
         return True, "", None
 
     def _validar_medida(self, medida):
-        if medida == "?":
-            return True
-
         try:
-            valor = float(medida.replace(",", "."))
+            normalizar_medida(medida, MAX_MEDIDA)
+            return True
         except ValueError:
             return False
-
-        return 0 < valor <= MAX_MEDIDA
 
     # ======================================================
     # GUARDADO REAL
@@ -1163,11 +1161,11 @@ class PantallaMedido(ctk.CTkFrame):
     def _tag_medida(self, medida):
         if medida == "?":
             return "interrogante"
-
-        if medida != self.medida_estandar:
+        try:
+            normalizar_medida(medida, MAX_MEDIDA)
+            return "resuelta"
+        except ValueError:
             return "especial"
-
-        return "normal"
 
     def _limpiar_formulario(self):
         self.matriz_inicio.delete(0, "end")

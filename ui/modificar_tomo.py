@@ -10,6 +10,7 @@ from config import (
     FONT_NORMAL, FONT_SUBTITLE, MAX_MEDIDA, MAX_OBSERVACIONES,
 )
 from excel.gestor_tomos import comprobar_continuidad, leer_tomos, modificar_tomo
+from core.validaciones import formatear_medida, normalizar_anio, normalizar_medida
 
 
 class VentanaModificarTomo(ctk.CTkToplevel):
@@ -135,6 +136,8 @@ class VentanaModificarTomo(ctk.CTkToplevel):
             entrada.delete(0, "end")
             valor = tomo[clave]
             if valor not in (None, ""):
+                if clave == "medida":
+                    valor = formatear_medida(valor)
                 entrada.insert(0, str(valor))
 
     def _validar(self):
@@ -142,20 +145,20 @@ class VentanaModificarTomo(ctk.CTkToplevel):
         obligatorios = ("anio", "matriz_inicio", "fecha_inicio", "matriz_final", "fecha_final", "medida")
         if any(not datos[clave] for clave in obligatorios):
             return None, "Completa todos los campos excepto observaciones."
+        try:
+            datos["anio"] = normalizar_anio(datos["anio"])
+        except ValueError:
+            return None, "El año debe ser un número entero."
         if not datos["matriz_inicio"].isdigit() or not datos["matriz_final"].isdigit():
             return None, "Las matrices inicial y final deben ser numéricas."
         if int(datos["matriz_final"]) < int(datos["matriz_inicio"]):
             return None, "La matriz final no puede ser menor que la matriz inicial."
         if len(datos["observaciones"]) > MAX_OBSERVACIONES:
             return None, f"Las observaciones no pueden superar {MAX_OBSERVACIONES} caracteres."
-        if datos["medida"] != "?":
-            try:
-                medida = float(datos["medida"].replace(",", "."))
-            except ValueError:
-                return None, "La medida debe ser un número o ?."
-            if medida <= 0 or medida > MAX_MEDIDA:
-                return None, f"La medida debe estar entre 0 y {MAX_MEDIDA}."
-            datos["medida"] = datos["medida"].replace(".", ",")
+        try:
+            datos["medida"] = normalizar_medida(datos["medida"], MAX_MEDIDA)
+        except ValueError as exc:
+            return None, str(exc)
         return datos, ""
 
     def _guardar(self):
