@@ -84,6 +84,8 @@ class VentanaModificarTomo(ctk.CTkToplevel):
                 text_color=COLOR_TEXT, font=FONT_NORMAL,
             )
             entrada.pack(side="left", fill="x", expand=True)
+            if clave == "medida":
+                entrada.bind("<KeyRelease>", self._normalizar_separador_medida)
             self.entradas[clave] = entrada
 
         botones = ctk.CTkFrame(panel_form, fg_color="transparent")
@@ -97,6 +99,17 @@ class VentanaModificarTomo(ctk.CTkToplevel):
             fg_color=COLOR_GREEN, hover_color=COLOR_GREEN_HOVER, text_color=COLOR_GREEN_TEXT,
             font=("Segoe UI", 13, "bold"),
         ).pack(side="right")
+
+    def _normalizar_separador_medida(self, event):
+        campo = event.widget
+        texto = campo.get()
+        if "." not in texto:
+            return
+        cursor = campo.index("insert")
+        normalizado = texto.replace(".", ",")
+        campo.delete(0, "end")
+        campo.insert(0, normalizado)
+        campo.icursor(min(cursor, len(normalizado)))
 
     def _cargar_tomos(self, seleccionar=0):
         try:

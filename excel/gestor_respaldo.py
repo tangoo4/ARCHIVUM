@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 
 from openpyxl import load_workbook
+from excel.lectura import es_tomo_real
 
 from core.nomenclatura import obtener_nombre_base
 

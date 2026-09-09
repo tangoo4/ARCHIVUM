@@ -27,7 +27,8 @@ from tkinter import messagebox
 from tkinter import ttk
 
 import customtkinter as ctk
-from openpyxl import load_workbook
+
+from excel.lectura import leer_tomos_temporada
 
 from config import (
     COLOR_BG,
@@ -90,31 +91,7 @@ class PanelControl(ctk.CTkFrame):
                 "No hay ningún Excel abierto para controlar.",
             )
             return []
-
-        wb = load_workbook(self.ruta_excel, data_only=True)
-        ws = wb.active
-
-        filas = []
-
-        for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-            tomo = ws[f"{COL_TOMO}{fila}"].value
-
-            if tomo in (None, ""):
-                continue
-
-            filas.append({
-                "fila_excel": fila,
-                "tomo": ws[f"{COL_TOMO}{fila}"].value,
-                "anio": ws[f"{COL_ANY}{fila}"].value,
-                "matriz_inicio": ws[f"{COL_PROT_INICIAL}{fila}"].value,
-                "fecha_inicio": ws[f"{COL_DATA_INICIAL}{fila}"].value,
-                "matriz_final": ws[f"{COL_PROT_FINAL}{fila}"].value,
-                "fecha_final": ws[f"{COL_DATA_FINAL}{fila}"].value,
-                "medida": ws[f"{COL_GRUIX}{fila}"].value,
-                "observaciones": ws[f"{COL_OBSERVACIONS}{fila}"].value or "",
-            })
-
-        return filas
+        return leer_tomos_temporada(self.ruta_excel, data_only=True)
 
     def _leer_produccion(self):
         """

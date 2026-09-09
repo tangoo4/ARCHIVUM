@@ -2,22 +2,21 @@
 
 import copy
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from excel.lectura import es_tomo_real
+from excel.estilos import FILL_AMARILLO, COLOR_AMARILLO_TEXTO
 
 FILA_INICIO_DATOS = 2
 COL_TOMO = "A"
 COL_CIERRE_INICIO = "C"
 COL_CIERRE_FIN = "D"
-FILL_CIERRE = PatternFill("solid", fgColor="FFEB9C")
+FILL_CIERRE = FILL_AMARILLO
 
 
 def buscar_ultima_fila_tomo(ws):
     """Devuelve la fila del último tomo real o None si no existen tomos."""
     ultima_fila = None
     for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-        try:
-            int(ws[f"{COL_TOMO}{fila}"].value)
-        except (TypeError, ValueError):
+        if not es_tomo_real(ws[f"{COL_TOMO}{fila}"].value):
             continue
         ultima_fila = fila
     return ultima_fila
@@ -62,7 +61,7 @@ def cerrar_temporada(ruta_excel, notario):
     borde_d = copy.copy(ws[f"D{ultima_fila}"].border)
     alineacion = copy.copy(ws[f"C{ultima_fila}"].alignment)
     fuente = copy.copy(ws[f"C{ultima_fila}"].font)
-    fuente.color = "9C5700"
+    fuente.color = COLOR_AMARILLO_TEXTO
 
     ws.merge_cells(rango)
     celda = ws[f"C{fila_cierre}"]

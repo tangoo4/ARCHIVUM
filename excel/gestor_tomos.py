@@ -4,46 +4,21 @@ import copy
 from pathlib import Path
 
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, PatternFill
 
 from core.validaciones import normalizar_anio, normalizar_medida
+from excel.lectura import leer_tomos_temporada
+from excel.estilos import aplicar_estado_fila
 from config import MAX_MEDIDA
 
 
 FILA_INICIO_DATOS = 2
 COLUMNAS_TOMO = "ABCDEFGH"
 
-FILL_VERDE = PatternFill("solid", fgColor="C6EFCE")
-FILL_ROJO = PatternFill("solid", fgColor="FFC7CE")
-FILL_AMARILLO = PatternFill("solid", fgColor="FFEB9C")
-FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
-ALINEACION_CENTRADA = Alignment(horizontal="center", vertical="center")
-
-
 def leer_tomos(ruta_excel):
-    """Lee únicamente las filas que representan tomos reales."""
-    wb = load_workbook(Path(ruta_excel), data_only=False)
-    ws = wb.active
-    tomos = []
-
-    for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-        try:
-            tomo = int(ws[f"A{fila}"].value)
-        except (TypeError, ValueError):
-            continue
-
-        tomos.append({
-            "fila": fila,
-            "tomo": tomo,
-            "anio": ws[f"B{fila}"].value,
-            "matriz_inicio": ws[f"C{fila}"].value,
-            "fecha_inicio": ws[f"D{fila}"].value,
-            "matriz_final": ws[f"E{fila}"].value,
-            "fecha_final": ws[f"F{fila}"].value,
-            "medida": ws[f"G{fila}"].value,
-            "observaciones": ws[f"H{fila}"].value or "",
-        })
-
+    """Lee los tomos usando el criterio común de Medido."""
+    tomos = leer_tomos_temporada(ruta_excel)
+    for tomo in tomos:
+        tomo["fila"] = tomo.pop("fila_excel")
     return tomos
 
 
@@ -103,21 +78,9 @@ def modificar_tomo(ruta_excel, tomo, datos, medida_estandar):
         ws[f"{columna}{fila_objetivo}"] = valor
 
     medida = datos["medida"]
-    if medida == "?":
-        fill = FILL_AMARILLO
-        color_texto = "9C5700"
-    else:
-        fill = FILL_VERDE
-        color_texto = "006100"
+    if medida != "?":
         ws[f"G{fila_objetivo}"].number_format = "0.0"
-
-    for columna in COLUMNAS_TOMO:
-        celda = ws[f"{columna}{fila_objetivo}"]
-        celda.fill = copy.copy(fill)
-        fuente = copy.copy(celda.font)
-        fuente.color = color_texto
-        celda.font = fuente
-        celda.alignment = copy.copy(ALINEACION_CENTRADA)
+    aplicar_estado_fila(ws, fila_objetivo, medida, COLUMNAS_TOMO)
 
     wb.save(ruta_excel)
 

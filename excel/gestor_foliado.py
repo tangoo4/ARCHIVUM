@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from openpyxl import load_workbook
+from excel.lectura import es_tomo_real
 
 
 FILA_INICIO_DATOS = 2
@@ -19,10 +20,9 @@ def leer_foliado(ruta_excel):
     tomos = []
 
     for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-        try:
-            tomo = int(ws[f"{COL_TOMO}{fila}"].value)
-        except (TypeError, ValueError):
+        if not es_tomo_real(ws[f"{COL_TOMO}{fila}"].value):
             continue
+        tomo = int(ws[f"{COL_TOMO}{fila}"].value)
 
         foliado = ws[f"{COL_FOLIADO}{fila}"].value
         hojas = ws[f"{COL_HOJAS}{fila}"].value
@@ -39,10 +39,9 @@ def guardar_foliado(ruta_excel, tomo, foliado):
 
     filas = []
     for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-        try:
-            numero_tomo = int(ws[f"{COL_TOMO}{fila}"].value)
-        except (TypeError, ValueError):
+        if not es_tomo_real(ws[f"{COL_TOMO}{fila}"].value):
             continue
+        numero_tomo = int(ws[f"{COL_TOMO}{fila}"].value)
         filas.append((fila, numero_tomo))
 
     indice = next((i for i, (_, numero) in enumerate(filas) if numero == tomo), None)

@@ -22,13 +22,14 @@ from tkinter import ttk
 
 import customtkinter as ctk
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, PatternFill
 
 from ui.control import PanelControl
 from ui.foliado import VentanaFoliado
 from ui.modificar_tomo import VentanaModificarTomo
 from excel.gestor_cierre import cerrar_temporada, temporada_cerrada
 from excel.gestor_respaldo import crear_respaldo_final, crear_respaldo_periodico
+from excel.lectura import leer_tomos_temporada
+from excel.estilos import aplicar_estado_fila
 from core.validaciones import formatear_medida, normalizar_anio, normalizar_medida
 
 from config import (
@@ -75,13 +76,6 @@ COLUMNAS_COLOR_FILA = [
     COL_GRUIX,
     COL_OBSERVACIONS,
 ]
-
-FILL_VERDE = PatternFill("solid", fgColor="C6EFCE")
-FILL_ROJO = PatternFill("solid", fgColor="FFC7CE")
-FILL_AMARILLO = PatternFill("solid", fgColor="FFEB9C")
-FILL_BLANCO = PatternFill("solid", fgColor="FFFFFF")
-
-ALINEACION_CENTRADA = Alignment(horizontal="center", vertical="center")
 
 MESES_AUTOCOMPLETAR = {
     "E": "ENERO", "EN": "ENERO", "ENE": "ENERO", "ENERO": "ENERO",
@@ -167,20 +161,8 @@ class PantallaMedido(ctk.CTkFrame):
 
         wb, ws = self._abrir_libro()
 
-        ultima_fila_con_datos = FILA_INICIO_DATOS - 1
-
-        for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-            tomo = ws[f"{COL_TOMO}{fila}"].value
-
-            # Solo consideramos una fila como tomo real si la columna TOMO
-            # contiene un número. Esto evita que estilos, fórmulas o restos
-            # de la plantilla hagan creer a Archivum que ya hay tomos guardados.
-            try:
-                int(tomo)
-            except Exception:
-                continue
-
-            ultima_fila_con_datos = fila
+        tomos = leer_tomos_temporada(self.ruta_excel)
+        ultima_fila_con_datos = tomos[-1]["fila_excel"] if tomos else FILA_INICIO_DATOS - 1
 
         if ultima_fila_con_datos < FILA_INICIO_DATOS:
             self.tomo_actual = 1
@@ -230,6 +212,12 @@ class PantallaMedido(ctk.CTkFrame):
             ws[f"{COL_GRUIX}{fila}"].number_format = "0.0"
         ws[f"{COL_OBSERVACIONS}{fila}"] = datos["observaciones"]
 
+        # MATRICES crece con cada tomo, sin depender de fórmulas precargadas.
+        if int(datos["tomo"]) == 1:
+            ws[f"I{fila}"] = f"=E{fila}"
+        else:
+            ws[f"I{fila}"] = f"=E{fila}-E{fila - 1}"
+
         self._aplicar_color_fila(ws, fila, datos["medida"])
         self._centrar_fila(ws, fila)
 
@@ -248,7 +236,7 @@ class PantallaMedido(ctk.CTkFrame):
         else:
             fila_base = FILA_INICIO_DATOS
 
-        for columna in COLUMNAS_COLOR_FILA:
+        for columna in "ABCDEFGHIJK":
             origen = ws[f"{columna}{fila_base}"]
             destino = ws[f"{columna}{fila}"]
 
@@ -263,19 +251,7 @@ class PantallaMedido(ctk.CTkFrame):
         ws.row_dimensions[fila].height = ws.row_dimensions[fila_base].height
 
     def _aplicar_color_fila(self, ws, fila, medida):
-        if medida == "?":
-            fill = FILL_AMARILLO
-            color_texto = "9C5700"
-        else:
-            fill = FILL_VERDE
-            color_texto = "006100"
-
-        for columna in COLUMNAS_COLOR_FILA:
-            celda = ws[f"{columna}{fila}"]
-            celda.fill = copy.copy(fill)
-            fuente = copy.copy(celda.font)
-            fuente.color = color_texto
-            celda.font = fuente
+        aplicar_estado_fila(ws, fila, medida, COLUMNAS_COLOR_FILA)
 
     def _centrar_fila(self, ws, fila):
         for columna in COLUMNAS_COLOR_FILA:
@@ -284,30 +260,7 @@ class PantallaMedido(ctk.CTkFrame):
     def _leer_filas_excel(self):
         if not self.ruta_excel or not self.ruta_excel.exists():
             return []
-
-        wb, ws = self._abrir_libro()
-        filas = []
-
-        for fila in range(FILA_INICIO_DATOS, ws.max_row + 1):
-            tomo = ws[f"{COL_TOMO}{fila}"].value
-
-            try:
-                int(tomo)
-            except Exception:
-                continue
-
-            filas.append({
-                "tomo": ws[f"{COL_TOMO}{fila}"].value,
-                "anio": ws[f"{COL_ANY}{fila}"].value,
-                "matriz_inicio": ws[f"{COL_PROT_INICIAL}{fila}"].value,
-                "fecha_inicio": ws[f"{COL_DATA_INICIAL}{fila}"].value,
-                "matriz_final": ws[f"{COL_PROT_FINAL}{fila}"].value,
-                "fecha_final": ws[f"{COL_DATA_FINAL}{fila}"].value,
-                "medida": ws[f"{COL_GRUIX}{fila}"].value,
-                "observaciones": ws[f"{COL_OBSERVACIONS}{fila}"].value or "",
-            })
-
-        return filas
+        return leer_tomos_temporada(self.ruta_excel)
 
     # ======================================================
     # INTERFAZ
@@ -570,7 +523,8 @@ class PantallaMedido(ctk.CTkFrame):
         self.fecha_final = self._crear_campo(panel, "FECHA FINAL", x_label, x_entry, y, ancho=240)
         y += salto
         self.medida = self._crear_campo(panel, "MEDIDA", x_label, x_entry, y, ancho=140)
-        self.medida.insert(0, self.medida_estandar)
+        self.medida.bind("<KeyRelease>", self._normalizar_separador_medida)
+        self.medida.insert(0, formatear_medida(self.medida_estandar))
         y += salto
         self.observaciones = self._crear_campo(panel, "OBSERVACIONES", x_label, x_entry, y, ancho=620)
 
@@ -983,6 +937,17 @@ class PantallaMedido(ctk.CTkFrame):
         campo.delete(0, "end")
         campo.insert(0, f"{dia} {mes}")
 
+    def _normalizar_separador_medida(self, event):
+        campo = event.widget
+        texto = campo.get()
+        if "." not in texto:
+            return
+        cursor = campo.index("insert")
+        normalizado = texto.replace(".", ",")
+        campo.delete(0, "end")
+        campo.insert(0, normalizado)
+        campo.icursor(min(cursor, len(normalizado)))
+
     def _mayusculas(self, event):
         campo = event.widget
         texto = campo.get()
@@ -1209,6 +1174,8 @@ class PantallaMedido(ctk.CTkFrame):
         """Muestra u oculta el buscador de matrices asociado a la vista Excel."""
         if self.panel_buscador.winfo_manager():
             self.panel_buscador.pack_forget()
+            self.entrada_busqueda.delete(0, "end")
+            self._limpiar_resultado_busqueda()
             return
 
         self.panel_buscador.pack(side="right", padx=(0, 8), pady=7)
