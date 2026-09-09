@@ -28,6 +28,7 @@ from ui.control import PanelControl
 from ui.foliado import VentanaFoliado
 from ui.modificar_tomo import VentanaModificarTomo
 from excel.gestor_cierre import cerrar_temporada, temporada_cerrada
+from excel.gestor_respaldo import crear_respaldo_final, crear_respaldo_periodico
 
 from config import (
     COLOR_BG,
@@ -126,6 +127,7 @@ class PantallaMedido(ctk.CTkFrame):
         self.ultima_matriz_final = None
         self.ultima_fecha_final = None
         self.matriz_inicio_esperada = None
+        self.resultado_busqueda_item = None
 
         self.pack(fill="both", expand=True)
 
@@ -319,7 +321,7 @@ class PantallaMedido(ctk.CTkFrame):
         self.matriz_inicio.focus_set()
 
     def _crear_cabecera(self):
-        cabecera = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=90, corner_radius=0)
+        cabecera = ctk.CTkFrame(self, fg_color=COLOR_PANEL, height=82, corner_radius=0)
         cabecera.pack(fill="x")
 
         ctk.CTkButton(
@@ -333,7 +335,7 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_TEXT,
             font=FONT_NORMAL,
             corner_radius=8,
-        ).place(x=22, y=13)
+        ).place(x=22, y=10)
 
         archivo = str(self.ruta_excel) if self.ruta_excel else "SIN ARCHIVO"
 
@@ -342,14 +344,14 @@ class PantallaMedido(ctk.CTkFrame):
             text=f"ARCHIVO: {archivo}",
             font=FONT_SUBTITLE,
             text_color=COLOR_TEXT,
-        ).place(x=130, y=17)
+        ).place(x=130, y=13)
 
         ctk.CTkLabel(
             cabecera,
             text="● GUARDADO",
             font=FONT_NORMAL,
             text_color=COLOR_GREEN,
-        ).place(x=130, y=52)
+        ).place(x=130, y=47)
 
         info = (
             f"TIPO: {self.contexto.tipo or '-'}    "
@@ -365,9 +367,9 @@ class PantallaMedido(ctk.CTkFrame):
             border_color=COLOR_BORDER,
             corner_radius=10,
             width=380,
-            height=68,
+            height=62,
         )
-        panel_info.place(relx=0.98, y=11, anchor="ne")
+        panel_info.place(relx=0.98, y=9, anchor="ne")
 
         ctk.CTkLabel(
             panel_info,
@@ -375,18 +377,18 @@ class PantallaMedido(ctk.CTkFrame):
             font=("Segoe UI", 13, "bold"),
             text_color=COLOR_CYAN,
             justify="left",
-        ).place(x=15, y=7)
+        ).place(x=15, y=5)
 
     def _crear_selector_area(self):
-        selector = ctk.CTkFrame(self, fg_color=COLOR_BG, height=48)
-        selector.pack(fill="x", padx=25, pady=(12, 0))
+        selector = ctk.CTkFrame(self, fg_color=COLOR_BG, height=42)
+        selector.pack(fill="x", padx=25, pady=(8, 0))
 
         self.boton_area_medido = ctk.CTkButton(
             selector,
             text="MEDIDO",
             command=lambda: self._mostrar_area("medido"),
             width=145,
-            height=38,
+            height=34,
             fg_color=COLOR_GREEN,
             hover_color=COLOR_GREEN,
             text_color=COLOR_TEXT,
@@ -400,7 +402,7 @@ class PantallaMedido(ctk.CTkFrame):
             text="CONTROL",
             command=lambda: self._mostrar_area("control"),
             width=145,
-            height=38,
+            height=34,
             fg_color=COLOR_PANEL_2,
             hover_color=COLOR_BORDER,
             text_color=COLOR_TEXT,
@@ -448,9 +450,9 @@ class PantallaMedido(ctk.CTkFrame):
             border_width=1,
             border_color=COLOR_BORDER,
             corner_radius=12,
-            height=58,
+            height=50,
         )
-        barra.pack(fill="x", padx=25, pady=(12, 0))
+        barra.pack(fill="x", padx=25, pady=(8, 0))
         barra.pack_propagate(False)
 
         ctk.CTkButton(
@@ -464,7 +466,7 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_TEXT,
             font=FONT_NORMAL,
             corner_radius=9,
-        ).pack(side="left", padx=(14, 7), pady=10)
+        ).pack(side="left", padx=(12, 6), pady=7)
 
         ctk.CTkButton(
             barra,
@@ -477,7 +479,7 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_TEXT,
             font=FONT_NORMAL,
             corner_radius=9,
-        ).pack(side="left", padx=7, pady=10)
+        ).pack(side="left", padx=6, pady=7)
 
         ctk.CTkButton(
             barra,
@@ -492,7 +494,7 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_TEXT,
             font=FONT_NORMAL,
             corner_radius=9,
-        ).pack(side="right", padx=14, pady=10)
+        ).pack(side="right", padx=12, pady=7)
 
     def _crear_panel_entrada(self):
         panel = ctk.CTkFrame(
@@ -501,16 +503,16 @@ class PantallaMedido(ctk.CTkFrame):
             border_width=1,
             border_color=COLOR_BORDER,
             corner_radius=16,
-            height=300,
+            height=245,
         )
-        panel.pack(fill="x", padx=25, pady=(20, 10))
+        panel.pack(fill="x", padx=25, pady=(10, 6))
 
         ctk.CTkLabel(
             panel,
             text="TOMO ACTUAL",
             font=FONT_NORMAL,
             text_color=COLOR_TEXT_MUTED,
-        ).place(x=35, y=30)
+        ).place(x=35, y=22)
 
         self.label_tomo = ctk.CTkLabel(
             panel,
@@ -519,17 +521,17 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_GREEN,
             fg_color=COLOR_PANEL_2,
             width=150,
-            height=85,
+            height=72,
             corner_radius=14,
         )
-        self.label_tomo.place(x=35, y=65)
+        self.label_tomo.place(x=35, y=52)
 
         ctk.CTkLabel(
             panel,
             text="MATRIZ INICIO ESPERADA",
             font=("Segoe UI", 12, "bold"),
             text_color=COLOR_TEXT_MUTED,
-        ).place(x=35, y=165)
+        ).place(x=35, y=137)
 
         self.label_matriz_esperada = ctk.CTkLabel(
             panel,
@@ -537,12 +539,12 @@ class PantallaMedido(ctk.CTkFrame):
             font=FONT_SUBTITLE,
             text_color=COLOR_CYAN,
         )
-        self.label_matriz_esperada.place(x=35, y=190)
+        self.label_matriz_esperada.place(x=35, y=161)
 
         x_label = 235
         x_entry = 430
-        y = 32
-        salto = 45
+        y = 22
+        salto = 37
 
         self.matriz_inicio = self._crear_campo(panel, "MATRIZ INICIO", x_label, x_entry, y, ancho=240)
         y += salto
@@ -558,7 +560,7 @@ class PantallaMedido(ctk.CTkFrame):
         self.observaciones = self._crear_campo(panel, "OBSERVACIONES", x_label, x_entry, y, ancho=620)
 
         self.mensaje = ctk.CTkLabel(panel, text="", font=FONT_SUBTITLE, text_color=COLOR_GREEN)
-        self.mensaje.place(x=35, y=245)
+        self.mensaje.place(x=35, y=207)
 
         self._autocompletar_matriz_inicio()
         self._autocompletar_fecha_inicio()
@@ -571,10 +573,10 @@ class PantallaMedido(ctk.CTkFrame):
             border_color=COLOR_BORDER,
             corner_radius=16,
         )
-        panel.pack(fill="both", expand=True, padx=25, pady=(10, 20))
+        panel.pack(fill="both", expand=True, padx=25, pady=(6, 10))
 
-        cabecera_excel = ctk.CTkFrame(panel, fg_color="transparent", height=48)
-        cabecera_excel.pack(fill="x", padx=20, pady=(8, 4))
+        cabecera_excel = ctk.CTkFrame(panel, fg_color="transparent", height=42)
+        cabecera_excel.pack(fill="x", padx=16, pady=(4, 2))
         cabecera_excel.pack_propagate(False)
 
         ctk.CTkLabel(
@@ -582,9 +584,9 @@ class PantallaMedido(ctk.CTkFrame):
             text="VISTA COMPLETA DEL EXCEL",
             font=FONT_SUBTITLE,
             text_color=COLOR_TEXT,
-        ).pack(side="left", pady=10)
+        ).pack(side="left", pady=7)
 
-        ctk.CTkButton(
+        self.boton_buscador = ctk.CTkButton(
             cabecera_excel,
             text="🔍",
             command=self._buscador,
@@ -595,10 +597,43 @@ class PantallaMedido(ctk.CTkFrame):
             text_color=COLOR_TEXT,
             font=("Segoe UI Emoji", 16),
             corner_radius=8,
-        ).pack(side="right", pady=7)
+        )
+        self.boton_buscador.pack(side="right", pady=4)
+
+        self.panel_buscador = ctk.CTkFrame(cabecera_excel, fg_color="transparent")
+
+        validar_matriz = (self.register(self._validar_entrada_busqueda), "%P")
+        self.entrada_busqueda = ctk.CTkEntry(
+            self.panel_buscador,
+            width=170,
+            height=34,
+            placeholder_text="Nº de matriz",
+            fg_color=COLOR_PANEL_2,
+            border_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=8,
+            validate="key",
+            validatecommand=validar_matriz,
+        )
+        self.entrada_busqueda.pack(side="left")
+        self.entrada_busqueda.bind("<Return>", self._ejecutar_busqueda)
+
+        ctk.CTkButton(
+            self.panel_buscador,
+            text="BUSCAR",
+            command=self._ejecutar_busqueda,
+            width=85,
+            height=34,
+            fg_color=COLOR_PANEL_2,
+            hover_color=COLOR_BORDER,
+            text_color=COLOR_TEXT,
+            font=FONT_NORMAL,
+            corner_radius=8,
+        ).pack(side="left", padx=(7, 0))
 
         contenedor = ctk.CTkFrame(panel, fg_color=COLOR_PANEL_2, corner_radius=10)
-        contenedor.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        contenedor.pack(fill="both", expand=True, padx=16, pady=(0, 12))
 
         columnas = (
             "tomo",
@@ -751,10 +786,24 @@ class PantallaMedido(ctk.CTkFrame):
             )
             return
 
+        error_respaldo = None
+        try:
+            crear_respaldo_final(self.ruta_excel)
+        except Exception as error:
+            error_respaldo = error
+
         messagebox.showinfo(
             "Temporada cerrada",
             "La temporada se ha cerrado correctamente.",
         )
+
+        if error_respaldo is not None:
+            messagebox.showwarning(
+                "No se pudo crear el respaldo",
+                "La temporada se ha cerrado y guardado correctamente, "
+                "pero no se ha podido crear la copia de seguridad final.\n\n"
+                f"Detalle: {error_respaldo}",
+            )
 
     def _modificar_tomo(self):
         """Abre el formulario de corrección de tomos anteriores."""
@@ -804,8 +853,11 @@ class PantallaMedido(ctk.CTkFrame):
         self.tabla.tag_configure("normal", background="#181818", foreground=COLOR_TEXT)
         self.tabla.tag_configure("especial", background=COLOR_RED, foreground="#FFFFFF")
         self.tabla.tag_configure("interrogante", background=COLOR_YELLOW, foreground="#000000")
+        self.tabla.tag_configure("busqueda", background="#39FF14", foreground="#000000")
 
     def _refrescar_tabla_desde_excel(self):
+        self.resultado_busqueda_item = None
+
         for item in self.tabla.get_children():
             self.tabla.delete(item)
 
@@ -1061,6 +1113,12 @@ class PantallaMedido(ctk.CTkFrame):
             messagebox.showerror("Error al guardar", f"No se pudo guardar en Excel:\n\n{e}")
             return
 
+        error_respaldo = None
+        try:
+            crear_respaldo_periodico(self.ruta_excel, datos["tomo"])
+        except Exception as error:
+            error_respaldo = error
+
         matriz_final_guardada = int(datos["matriz_final"])
         self.ultima_matriz_final = matriz_final_guardada
         self.ultima_fecha_final = datos["fecha_final"]
@@ -1079,6 +1137,14 @@ class PantallaMedido(ctk.CTkFrame):
         self._autocompletar_fecha_inicio()
 
         self.fecha_inicio.focus_set()
+
+        if error_respaldo is not None:
+            messagebox.showwarning(
+                "No se pudo crear el respaldo",
+                "El tomo se ha guardado correctamente, pero no se ha podido "
+                "crear la copia de seguridad.\n\n"
+                f"Detalle: {error_respaldo}",
+            )
 
     def _tag_medida(self, medida):
         if medida == "?":
@@ -1128,5 +1194,70 @@ class PantallaMedido(ctk.CTkFrame):
     # ======================================================
 
     def _buscador(self):
-        messagebox.showinfo("Buscador", "Buscador pendiente.")
+        """Muestra u oculta el buscador de matrices asociado a la vista Excel."""
+        if self.panel_buscador.winfo_manager():
+            self.panel_buscador.pack_forget()
+            return
+
+        self.panel_buscador.pack(side="right", padx=(0, 8), pady=7)
+        self.entrada_busqueda.focus_set()
+
+    def _validar_entrada_busqueda(self, valor):
+        """Permite únicamente números enteros positivos en el campo de búsqueda."""
+        return valor == "" or valor.isdigit()
+
+    def _limpiar_resultado_busqueda(self):
+        """Restaura el aspecto normal de la fila resaltada anteriormente."""
+        item = self.resultado_busqueda_item
+        self.resultado_busqueda_item = None
+
+        if not item or not self.tabla.exists(item):
+            return
+
+        valores = self.tabla.item(item, "values")
+        medida = str(valores[6] or "") if len(valores) > 6 else ""
+        self.tabla.item(item, tags=(self._tag_medida(medida),))
+
+    def _ejecutar_busqueda(self, _event=None):
+        """Localiza la matriz por los rangos Inicio-Final de los tomos visibles."""
+        texto = self.entrada_busqueda.get().strip()
+        if not texto:
+            return
+
+        matriz = int(texto)
+        coincidencias = []
+
+        for item in self.tabla.get_children():
+            valores = self.tabla.item(item, "values")
+            try:
+                inicio = int(valores[2])
+                final = int(valores[4])
+            except (TypeError, ValueError, IndexError):
+                continue
+
+            if inicio <= matriz <= final:
+                coincidencias.append(item)
+
+        self._limpiar_resultado_busqueda()
+
+        if not coincidencias:
+            messagebox.showinfo(
+                "Matriz no encontrada",
+                "La matriz indicada no pertenece a ningún tomo de esta temporada.",
+                parent=self,
+            )
+            return
+
+        if len(coincidencias) > 1:
+            messagebox.showwarning(
+                "Rangos incompatibles",
+                "La matriz indicada pertenece a más de un tomo. Revisa los rangos de la temporada.",
+                parent=self,
+            )
+            return
+
+        item = coincidencias[0]
+        self.tabla.item(item, tags=("busqueda",))
+        self.tabla.see(item)
+        self.resultado_busqueda_item = item
 
