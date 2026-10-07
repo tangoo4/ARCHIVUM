@@ -29,7 +29,7 @@ from ui.modificar_tomo import VentanaModificarTomo
 from excel.gestor_cierre import cerrar_temporada, temporada_cerrada
 from excel.gestor_respaldo import crear_respaldo_final, crear_respaldo_periodico
 from excel.lectura import leer_tomos_temporada
-from excel.estilos import aplicar_estado_fila
+from excel.estilos import ALINEACION_CENTRADA, aplicar_estado_fila
 from core.validaciones import formatear_medida, normalizar_anio, normalizar_medida
 
 from config import (
@@ -209,7 +209,7 @@ class PantallaMedido(ctk.CTkFrame):
         ws[f"{COL_DATA_FINAL}{fila}"] = datos["fecha_final"]
         ws[f"{COL_GRUIX}{fila}"] = normalizar_medida(datos["medida"], MAX_MEDIDA)
         if datos["medida"] != "?":
-            ws[f"{COL_GRUIX}{fila}"].number_format = "0.0"
+            ws[f"{COL_GRUIX}{fila}"].number_format = "0.##"
         ws[f"{COL_OBSERVACIONS}{fila}"] = datos["observaciones"]
 
         # MATRICES crece con cada tomo, sin depender de fórmulas precargadas.

@@ -1,17 +1,17 @@
 """
-Pantalla de inicio de Archivum
-Versión 0.5.2
+Pantalla de inicio de ARCHIVUM.
 
-Cambios:
-- Al continuar temporada pide la medida estándar.
+Continuar temporada:
 - Intenta deducir tipo, notario y año desde el nombre del archivo.
+- Pregunta Notario, Año y Medida estándar antes de abrir Medido.
+- Los valores detectados pueden corregirse manualmente.
 """
 
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, simpledialog
-from pathlib import Path
 
 from core.nomenclatura import extraer_datos_desde_nombre
+from core.validaciones import normalizar_anio, normalizar_medida
 
 from config import (
     APP_NAME,
@@ -30,6 +30,7 @@ from config import (
     FONT_NORMAL,
     FONT_SUBTITLE,
     DIR_TEMPORADAS,
+    MAX_MEDIDA,
 )
 
 
@@ -112,47 +113,64 @@ class PantallaInicio(ctk.CTkFrame):
         if not archivo:
             return
 
+        # Intentar deducir datos del nombre, pero nunca depender de que
+        # la detección sea perfecta: el usuario los confirma/corrige.
+        datos_nombre = extraer_datos_desde_nombre(archivo)
+
+        if datos_nombre is not None:
+            tipo_detectado, notario_detectado, anio_detectado = datos_nombre
+        else:
+            tipo_detectado = self.app.contexto.tipo or ""
+            notario_detectado = self.app.contexto.notario or ""
+            anio_detectado = self.app.contexto.anio or ""
+
+        notario = simpledialog.askstring(
+            "Notario",
+            "Confirma o corrige el nombre del notario:",
+            initialvalue=notario_detectado,
+            parent=self,
+        )
+        if notario:
+            notario = notario.strip()
+        if not notario:
+            messagebox.showwarning("Notario incorrecto", "Debes indicar el nombre del notario.")
+            return
+
+        anio = simpledialog.askstring(
+            "Año",
+            "Confirma o corrige el año de la temporada:",
+            initialvalue=str(anio_detectado or ""),
+            parent=self,
+        )
+        if anio is None:
+            return
+
+        try:
+            anio = normalizar_anio(anio)
+        except ValueError as exc:
+            messagebox.showwarning("Año incorrecto", str(exc))
+            return
+
         medida = simpledialog.askstring(
             "Medida estándar",
             "Introduce la medida estándar de esta temporada:",
             initialvalue=self.app.contexto.medida_estandar or "8,5",
             parent=self,
         )
-
-        if not medida:
+        if medida is None:
             return
 
-        medida = medida.strip().replace(".", ",")
-
-        if not self._validar_medida(medida):
-            messagebox.showwarning(
-                "Medida incorrecta",
-                "La medida estándar debe ser un número máximo 10. Usa coma si hay decimal."
-            )
-            return
-
-        self.app.contexto.archivo_actual = archivo
-        self.app.contexto.medida_estandar = medida
-
-        self._rellenar_contexto_desde_nombre(archivo)
-
-        self.app.mostrar_medido()
-
-    def _validar_medida(self, medida):
         try:
-            valor = float(medida.replace(",", "."))
-        except ValueError:
-            return False
-
-        return 0 < valor <= 10
-
-    def _rellenar_contexto_desde_nombre(self, archivo):
-        """Rellena el contexto sin renombrar la temporada existente."""
-        datos = extraer_datos_desde_nombre(archivo)
-        if datos is None:
+            medida = normalizar_medida(medida, MAX_MEDIDA)
+        except ValueError as exc:
+            messagebox.showwarning("Medida incorrecta", str(exc))
             return
 
-        tipo, notario, anio = datos
-        self.app.contexto.tipo = tipo
+        # El contexto queda completo ANTES de abrir Medido.
+        self.app.contexto.archivo_actual = archivo
+        self.app.contexto.tipo = tipo_detectado or self.app.contexto.tipo or ""
         self.app.contexto.notario = notario
         self.app.contexto.anio = anio
+        self.app.contexto.medida_estandar = medida
+
+        self.app.mostrar_medido()
